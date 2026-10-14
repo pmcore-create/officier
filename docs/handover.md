@@ -95,6 +95,19 @@ SHA256SUMS                                   контрольные суммы
 
 ## 4. Установка
 
+Быстрый путь — установщик `officier-install.sh` из релиза (в репозитории `deploy/install.sh`). Он
+проверит сервер, сверит контрольные суммы, загрузит образы, создаст `.env` со случайными секретами,
+запустит сервисы и проверит, что сервер документов отвечает, а шлюз выдаёт подписанные конфигурации.
+Повторный запуск с пакетом новой версии обновляет образы, секреты сохраняются.
+
+```sh
+tar -xf officier-0.2.0-package.tar && cd officier-0.2.0
+sudo bash ../officier-install.sh --public-url https://docs.<домен> --gateway-bind <внутренний IP>
+# установка в /opt/officier, ключ шлюза и JWT_SECRET — в /opt/officier/.env
+```
+
+Вручную то же самое:
+
 ```sh
 sha256sum -c SHA256SUMS
 docker load -i images/officier-0.2.0.tar.gz
