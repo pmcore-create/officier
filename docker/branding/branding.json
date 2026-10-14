@@ -6,7 +6,7 @@
     "pdfeditor": "Редактор PDF",
     "visioeditor": "Просмотр диаграмм"
   },
-  "sourceUrl": "https://github.com/baken667/officier",
+  "sourceUrl": "https://github.com/pmcore-create/officier",
   "api": {
     "productName": "Редактор документов",
     "legalNotice": "Изменённая версия ONLYOFFICE Docs 9.4.0, исходный разработчик — Ascensio System SIA. Изменения Officier: 2026-09-09, 2026-10-13, 2026-10-14. Распространяется по лицензии GNU AGPL v3 с дополнительными условиями.",

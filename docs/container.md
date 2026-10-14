@@ -1,7 +1,7 @@
 # Контейнер Officier
 
-Опубликован публичный образ [`ghcr.io/baken667/officier:0.1.0`](https://github.com/baken667/officier/pkgs/container/officier), платформа `linux/amd64`.
-[Сборка и браузерные проверки прошли](https://github.com/baken667/officier/actions/runs/34327054937).
+Опубликован публичный образ [`ghcr.io/pmcore-create/officier:0.1.0`](https://github.com/pmcore-create/officier/pkgs/container/officier), платформа `linux/amd64`.
+[Сборка и браузерные проверки прошли](https://github.com/pmcore-create/officier/actions/runs/34327054937).
 
 - Исходники образа: `57829b0ae83e849340d7bcad1e6f5f86d7dcd384`.
 - Digest: `sha256:d6ea16913f3d19a743d33d05ed770f88102c2b3514b66273af5f73d6a4819dca`.
@@ -9,7 +9,7 @@
 - Теги первой версии: `0.1.0`, `sha-57829b0ae83e849340d7bcad1e6f5f86d7dcd384`, `latest`.
 
 ```sh
-docker pull --platform linux/amd64 ghcr.io/baken667/officier:0.1.0
+docker pull --platform linux/amd64 ghcr.io/pmcore-create/officier:0.1.0
 ```
 
 ## Почему GHCR
