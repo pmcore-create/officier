@@ -11,3 +11,6 @@ server/**/node_modules
 !LICENSE
 !tests/
 !tests/capabilities.test.cjs
+!tests/branding.test.cjs
+!tests/converter.test.cjs
+!tests/config.test.cjs

@@ -1,6 +1,8 @@
+# Development stack (builds the gateway and the demo). Production: deploy/compose.yaml — keep in step.
 services:
   officier:
-    image: ghcr.io/baken667/officier:0.1.0
+    # The release package loads officier:0.2.0 (docker load); the QMS gateway relies on its plugins.
+    image: ${OFFICIER_IMAGE:-officier:0.2.0}
     platform: linux/amd64
     restart: unless-stopped
     ports:
@@ -8,14 +10,70 @@ services:
     environment:
       JWT_ENABLED: "true"
       JWT_SECRET: "${JWT_SECRET:?Set JWT_SECRET in .env before starting}"
+      # The portal and its files live in the corporate network (private addresses).
+      # The server only fetches URLs from configs signed with JWT_SECRET.
+      ALLOW_PRIVATE_IP_ADDRESS: "${OFFICIER_ALLOW_PRIVATE_IP:-true}"
+      # nginx on every core; worker_connections follows the open-files limit below.
+      NGINX_WORKER_PROCESSES: "auto"
+      # Empty: 60% of the container memory (see docker/install.sh).
+      DOCSERVICE_MAX_HEAP_MB: "${OFFICIER_DOCSERVICE_HEAP_MB:-}"
+    # One open editor is one WebSocket: lift the default 1024 open files.
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     shm_size: 1gb
+    # Unsaved co-editing changes live in DocService memory (Community runtime). On stop the container
+    # runs documentserver-prepare4shutdown.sh to save open documents; Docker's default 10 s is too short.
+    stop_grace_period: 2m
     volumes:
       - data:/var/www/onlyoffice/Data
       - cache:/var/lib/onlyoffice
       - logs:/var/log/onlyoffice
+      # Fonts added here appear in the editors after a container restart (docs/container.md).
       - fonts:/usr/share/fonts/truetype/custom
+  qms-gateway:
+    build: ./gateway
+    image: ${OFFICIER_GATEWAY_IMAGE:-officier-qms-gateway:0.2.0}
+    restart: unless-stopped
+    depends_on:
+      - officier
+    ports:
+      # Only the portal backend calls the gateway: bind it to the internal interface, never publish it.
+      - "${GATEWAY_BIND:-${OFFICIER_BIND:-127.0.0.1}}:${GATEWAY_PORT:-8081}:8081"
+    environment:
+      OFFICIER_JWT_SECRET: "${JWT_SECRET:?Set JWT_SECRET in .env before starting}"
+      GATEWAY_API_KEY: "${GATEWAY_API_KEY:?Set GATEWAY_API_KEY in .env before starting}"
+      # Address of the document server as the browser sees it (api.js URL returned to the portal).
+      OFFICIER_PUBLIC_URL: "${OFFICIER_PUBLIC_URL:-http://127.0.0.1:8080}"
+      # Server-to-server: Command API and PDF conversion, and the print copy the document server fetches.
+      OFFICIER_INTERNAL_URL: "http://officier"
+      GATEWAY_INTERNAL_URL: "http://qms-gateway:8081"
+      # Decision dates on the approval sheet.
+      QMS_TIME_ZONE: "${QMS_TIME_ZONE:-Asia/Almaty}"
+  # Demo portal for showing the integration: docker compose --profile demo up -d
+  demo:
+    profiles: ["demo"]
+    build: ./demo
+    image: officier-qms-demo:0.2.0
+    restart: unless-stopped
+    depends_on:
+      - officier
+      - qms-gateway
+    ports:
+      - "${OFFICIER_BIND:-127.0.0.1}:${DEMO_PORT:-8090}:8090"
+    environment:
+      GATEWAY_API_KEY: "${GATEWAY_API_KEY:?Set GATEWAY_API_KEY in .env before starting}"
+      GATEWAY_URL: "http://qms-gateway:8081"
+      DEMO_INTERNAL_URL: "http://demo:8090"
+      OFFICIER_INTERNAL_URL: "http://officier"
+    volumes:
+      - demo-data:/app/data
 volumes:
   data:
   cache:
   logs:
   fonts:
+  demo-data:

@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Рецензирование</title>
+<script src="../v1/plugins.js"></script>
+<link rel="stylesheet" href="../v1/plugins.css">
+<style>
+  html, body { margin: 0; height: 100%; }
+  body { font: 12px/1.4 "Segoe UI", Arial, sans-serif; color: var(--text-normal, #222); background: var(--background-normal, #fff); overflow-y: auto; }
+  #summary { padding: 10px 12px 8px; color: var(--text-secondary, #666); border-bottom: 1px solid var(--border-divider, #e5e5e5); }
+  .author { border-bottom: 1px solid var(--border-divider, #e5e5e5); }
+  .author-head { display: flex; align-items: flex-start; gap: 8px; padding: 10px 12px 6px; }
+  .swatch { width: 12px; height: 12px; border-radius: 3px; flex: none; margin-top: 2px; }
+  .title { min-width: 0; }
+  .name { font-weight: 600; }
+  .stage { color: var(--text-secondary, #666); }
+  .change { display: block; box-sizing: border-box; width: 100%; text-align: left; border: 0; border-left: 3px solid transparent; background: none; color: inherit; font: inherit; padding: 6px 12px 7px 21px; cursor: pointer; }
+  .change:hover, .change:focus-visible { background: var(--highlight-button-hover, #f1f1f1); outline: none; }
+  .note, .note:hover { cursor: default; background: none; }
+  .what { color: var(--text-secondary, #666); }
+  .value { word-break: break-word; }
+  .value.add { color: #1d7a3e; }
+  .value.del { color: #b3261e; text-decoration: line-through; }
+  .context { color: var(--text-tertiary, #999); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .empty { padding: 24px 12px; color: var(--text-secondary, #666); text-align: center; }
+  .hidden { display: none !important; }
+  #actions { padding: 8px 12px; border-bottom: 1px solid var(--border-divider, #e5e5e5); }
+  #lock { width: 100%; padding: 6px 10px; border: 1px solid var(--border-regular-control, #c0c0c0); border-radius: 4px; background: var(--background-normal, #fff); color: inherit; font: inherit; cursor: pointer; }
+  #lock:hover { background: var(--highlight-button-hover, #f1f1f1); }
+  .message { margin-top: 6px; color: #1d7a3e; }
+  .message.error { color: #b3261e; }
+  .locks { border-bottom: 1px solid var(--border-divider, #e5e5e5); padding-bottom: 4px; }
+  .section-title { font-weight: 600; padding: 10px 12px 4px; }
+  .lock { padding: 6px 12px 6px 21px; border-left: 3px solid #8a8a8a; margin: 2px 0; }
+  .lock-actions { display: flex; gap: 12px; margin-top: 2px; }
+  .link { border: 0; padding: 0; background: none; color: #155dd0; font: inherit; cursor: pointer; }
+  .link:hover { text-decoration: underline; }
+  .link.reject { color: #b3261e; }
+  .decide { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; padding: 0 12px 8px 24px; }
+  .decide-label { width: 100%; color: var(--text-secondary, #666); }
+  .decide-text { width: 100%; box-sizing: border-box; resize: vertical; font: inherit; padding: 5px 6px; border: 1px solid var(--border-regular-control, #c0c0c0); border-radius: 4px; background: var(--background-normal, #fff); color: inherit; }
+  .decide-actions { display: flex; align-items: center; gap: 14px; }
+  .decide-confirm { padding: 4px 10px; border: 1px solid #1d7a3e; border-radius: 4px; background: #1d7a3e; color: #fff; font: inherit; cursor: pointer; }
+  .decide-confirm.reject { border-color: #b3261e; background: #b3261e; }
+  .decide-confirm:disabled { opacity: .45; cursor: not-allowed; }
+  .orphans { background: #fff6e5; border-bottom: 1px solid #f0d9a8; padding-bottom: 4px; }
+  .hint { padding: 0 12px 6px; color: var(--text-secondary, #666); }
+  .decisions { padding-bottom: 6px; }
+  .decision { padding: 6px 12px 6px 21px; border-left: 3px solid #8a8a8a; margin: 2px 0; }
+  .decision.accepted { border-left-color: #1d7a3e; }
+  .decision.rejected { border-left-color: #b3261e; }
+  .decision.accepted .what { color: #1d7a3e; }
+  .decision.rejected .what { color: #b3261e; }
+  .reason { margin-top: 2px; white-space: pre-wrap; }
+</style>
+<script src="review.js"></script>
+</head>
+<body>
+<div id="summary">Загрузка правок…</div>
+<div id="actions">
+  <button id="lock" class="hidden" type="button" title="Выделенный текст сможет изменить только разработчик документа">Заблокировать выделенное</button>
+  <div id="message" class="message hidden" role="status"></div>
+</div>
+<div id="list"></div>
+</body>
+</html>

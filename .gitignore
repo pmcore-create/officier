@@ -6,3 +6,7 @@ node_modules/
 *.log
 __pycache__/
 /clients/officier-react/
+# Release package and the source archive embedded into the image (scripts/package-release.sh).
+/release/
+/docker/source/*.tar.gz
+/demo/data/

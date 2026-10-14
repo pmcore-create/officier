@@ -1,0 +1,28 @@
+{
+  "name": "Рецензирование",
+  "nameLocale": {"en": "Review"},
+  "guid": "asc.{8D3B2A54-0C1E-4F6A-9B7D-2E5F1C3A9D61}",
+  "version": "1.0.0",
+  "variations": [
+    {
+      "description": "Кто и что изменил в документе (для режимов без правой панели: комментарии и просмотр)",
+      "url": "../qms-review/index.html",
+      "icons": ["../qms-review/resources/icon.svg", "../qms-review/resources/icon.svg"],
+      "icons2": [
+        {"style": "light", "*": {"normal": "../qms-review/resources/icon.svg"}},
+        {"style": "dark", "*": {"normal": "../qms-review/resources/icon-dark.svg"}}
+      ],
+      "isViewer": true,
+      "EditorsSupport": ["word"],
+      "isVisual": true,
+      "isModal": false,
+      "isInsideMode": true,
+      "type": "panel",
+      "initDataType": "none",
+      "initData": "",
+      "buttons": [],
+      "events": ["onKeyDown", "onClick", "onTargetPositionChanged"],
+      "size": [320, 400]
+    }
+  ]
+}

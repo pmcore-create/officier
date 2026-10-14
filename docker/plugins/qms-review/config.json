@@ -1,0 +1,28 @@
+{
+  "name": "Рецензирование",
+  "nameLocale": {"en": "Review"},
+  "guid": "asc.{8D3B2A54-0C1E-4F6A-9B7D-2E5F1C3A9D60}",
+  "version": "1.0.0",
+  "variations": [
+    {
+      "description": "Кто и что изменил в документе",
+      "url": "index.html",
+      "icons": ["resources/icon.svg", "resources/icon.svg"],
+      "icons2": [
+        {"style": "light", "*": {"normal": "resources/icon.svg"}},
+        {"style": "dark", "*": {"normal": "resources/icon-dark.svg"}}
+      ],
+      "isViewer": true,
+      "EditorsSupport": ["word"],
+      "isVisual": true,
+      "isModal": false,
+      "isInsideMode": true,
+      "type": "panelRight",
+      "initDataType": "none",
+      "initData": "",
+      "buttons": [],
+      "events": ["onKeyDown", "onClick", "onTargetPositionChanged"],
+      "size": [320, 400]
+    }
+  ]
+}

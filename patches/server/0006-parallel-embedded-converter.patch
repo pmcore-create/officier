@@ -1,0 +1,90 @@
+diff --git a/DocService/sources/embeddedConverter.js b/DocService/sources/embeddedConverter.js
+index ff16f4f..4518dcd 100644
+--- a/DocService/sources/embeddedConverter.js
++++ b/DocService/sources/embeddedConverter.js
+@@ -43,13 +43,14 @@
+ 
+ 'use strict';
+ 
++const os = require('os');
+ const config = require('config');
+ const profile = require('../../Common/sources/runtime/profile');
+ const operationContext = require('../../Common/sources/operationContext');
+ const InprocTaskQueue = require('../../Common/sources/taskqueueMemory');
+ 
+ let startPromise = null;
+-let runnerQueue = null;
++let runnerQueues = [];
+ 
+ /**
+  * Read FileConverter.converter.maxprocesscount safely.
+@@ -69,24 +70,25 @@ async function _doStart() {
+   // Lazy-require: keeps FileConverter out of the module graph in Enterprise deployments.
+   const converter = require('../../FileConverter/sources/converter');
+ 
+-  const maxProcessCount = readMaxProcessCount();
+-  if (maxProcessCount > 1) {
+-    operationContext.global.logger.warn(
+-      'embedded converter: FileConverter.converter.maxprocesscount=%d is ignored; using a single in-process subscriber',
+-      maxProcessCount
+-    );
+-  }
++  // Officier: one subscriber per CPU x maxprocesscount, like convertermaster.js does for worker
++  // processes. The in-process backend hands a task only to a free subscriber, so a single one
++  // serialized every open/save conversion; x2t runs as a child process, so they can overlap.
++  const workersCount = Math.max(1, Math.ceil((os.availableParallelism?.() || os.cpus().length) * readMaxProcessCount()));
+ 
+-  // The queue handle on the converter side must:
++  // Each queue handle on the converter side must:
+   //   - publish responses (isAddResponse=true)
+   //   - receive tasks (isAddTaskReceive=true)
+   //   - publish tasks for retries/redelivery simulation (isAddTask=true)
+-  const queue = new InprocTaskQueue(converter.simulateErrorResponse);
+-  converter.createRunner(queue);
+-  await queue.initPromise(true, true, true, false, false, false);
++  const queues = [];
++  for (let i = 0; i < workersCount; i++) {
++    const queue = new InprocTaskQueue(converter.simulateErrorResponse);
++    converter.createRunner(queue);
++    await queue.initPromise(true, true, true, false, false, false);
++    queues.push(queue);
++  }
+ 
+-  runnerQueue = queue;
+-  operationContext.global.logger.warn('embedded converter started');
++  runnerQueues = queues;
++  operationContext.global.logger.warn('embedded converter started with %d parallel subscribers', workersCount);
+ }
+ 
+ /**
+@@ -110,13 +112,14 @@ function start() {
+  */
+ async function stop() {
+   startPromise = null;
+-  if (!runnerQueue) return;
+-  try {
+-    await runnerQueue.close();
+-  } catch (err) {
+-    operationContext.global.logger.warn('embedded converter close error: %s', err && err.stack);
+-  } finally {
+-    runnerQueue = null;
++  const queues = runnerQueues;
++  runnerQueues = [];
++  for (const queue of queues) {
++    try {
++      await queue.close();
++    } catch (err) {
++      operationContext.global.logger.warn('embedded converter close error: %s', err && err.stack);
++    }
+   }
+ }
+ 
+@@ -124,7 +127,7 @@ async function stop() {
+  * @returns {boolean}
+  */
+ function isStarted() {
+-  return runnerQueue !== null;
++  return runnerQueues.length > 0;
+ }
+ 
+ module.exports = {start, stop, isStarted};

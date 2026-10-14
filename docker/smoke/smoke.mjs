@@ -134,6 +134,23 @@ try {
   assert(editor, 'Word editor iframe did not load');
   await editor.waitForFunction(() => !!window.Asc?.editor?.WordControl?.m_oLogicDocument);
   assert.equal(await editor.evaluate(() => window.Asc.editor.isViewMode), false);
+  // Officier branding: no ONLYOFFICE marks in the working UI, legal notice stays in File > About.
+  const branding = await editor.evaluate(() => {
+    const about = DE.getController('LeftMenu').leftMenu.getMenu('about');
+    about.show();
+    return {
+      title: document.title,
+      logoHidden: document.querySelector('#header-logo')?.classList.contains('hidden') ?? true,
+      about: about.$el.text().replace(/\s+/g, ' ')
+    };
+  });
+  await page.screenshot({path: new URL('./smoke-about.png', import.meta.url).pathname});
+  await editor.evaluate(() => DE.getController('LeftMenu').leftMenu.getMenu('about').hide());
+  assert.doesNotMatch(branding.title, /ONLYOFFICE/i, JSON.stringify(branding));
+  assert.equal(branding.logoHidden, true, JSON.stringify(branding));
+  assert.match(branding.about, /ONLYOFFICE Docs 9\.4\.0.*Ascensio System SIA/, branding.about);
+  assert.match(branding.about, /\/welcome\/officier\.html/, branding.about);
+  console.log('Branding checks passed:', branding.title);
   await editor.evaluate(() => {window.Asc.editor.asc_AddText('OfficierSavedMarker'); window.Asc.editor.asc_Save();});
   await page.screenshot({path: new URL('./smoke.png', import.meta.url).pathname});
   // Closing the editor exercises the ordinary save callback path.

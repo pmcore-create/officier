@@ -1,4 +1,6 @@
 node_modules/
 document.docx
-saved.docx
-smoke.png
+saved*.docx
+smoke*.png
+approved*.pdf
+approved*.docx

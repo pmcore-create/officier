@@ -1,0 +1,417 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Стенд СМК — редактор документов</title>
+<style>
+  :root {
+    --blue: #1565d8; --blue-dark: #0f4fae; --blue-soft: #eaf2ff;
+    --ink: #172033; --muted: #5d6779; --line: #e1e5ec; --bg: #f3f5f8; --card: #fff;
+    --ok: #1d8a4e; --warn: #b26a00; --err: #c62828;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--ink); background: var(--bg); display: flex; flex-direction: column; }
+  header { background: linear-gradient(90deg, #0d47a1, var(--blue)); color: #fff; padding: 12px 20px; display: flex; align-items: center; gap: 16px; }
+  header h1 { font-size: 16px; font-weight: 600; margin: 0; }
+  header .hint { opacity: .85; font-size: 13px; }
+  .layout { flex: 1; display: grid; grid-template-columns: 340px 1fr; min-height: 0; }
+  aside { background: var(--card); border-right: 1px solid var(--line); overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+  h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 0 0 6px; }
+  label { display: block; font-size: 12px; color: var(--muted); margin: 8px 0 3px; }
+  select, input[type=number] { width: 100%; padding: 7px 9px; border: 1px solid var(--line); border-radius: 8px; font: inherit; background: #fff; color: var(--ink); }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .buttons { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  button, .button { border: 1px solid var(--line); background: #fff; color: var(--ink); border-radius: 8px; padding: 7px 11px; font: inherit; cursor: pointer; text-decoration: none; }
+  button:hover, .button:hover { border-color: var(--blue); color: var(--blue); }
+  button.primary { background: var(--blue); border-color: var(--blue); color: #fff; width: 100%; padding: 10px; font-weight: 600; }
+  button.primary:hover { background: var(--blue-dark); color: #fff; }
+  .meta { font-size: 12px; color: var(--muted); margin-top: 6px; }
+  .policy { background: var(--blue-soft); border-radius: 10px; padding: 10px 12px; font-size: 13px; display: none; }
+  .policy.visible { display: block; }
+  .policy b { display: block; font-size: 14px; margin-bottom: 2px; }
+  .message { font-size: 13px; border-radius: 8px; padding: 8px 10px; display: none; }
+  .message.visible { display: block; }
+  .message.error { background: #fdecea; color: var(--err); }
+  .message.info { background: #edf7f0; color: var(--ok); }
+  details { border-top: 1px solid var(--line); padding-top: 10px; font-size: 13px; color: var(--muted); }
+  details summary { cursor: pointer; color: var(--ink); font-weight: 600; }
+  details ol { padding-left: 18px; margin: 8px 0 0; }
+  details li { margin: 4px 0; }
+  main { min-width: 0; min-height: 0; display: flex; }
+  #host { flex: 1; min-height: 0; position: relative; }
+  .empty { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); text-align: center; padding: 24px; }
+  dialog { width: min(1100px, 94vw); max-height: 88vh; border: none; border-radius: 14px; padding: 0; box-shadow: 0 20px 60px rgba(0,0,0,.25); }
+  dialog::backdrop { background: rgba(15, 25, 45, .45); }
+  .dialog-head { position: sticky; top: 0; background: #fff; padding: 14px 18px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+  .dialog-head h3 { margin: 0; font-size: 16px; }
+  .dialog-body { padding: 14px 18px 20px; overflow: auto; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+  .chip { background: var(--bg); border-radius: 999px; padding: 4px 10px; font-size: 12px; }
+  .chip.warn { background: #fff4e0; color: var(--warn); }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 18px; font-size: 13px; }
+  th, td { text-align: left; vertical-align: top; padding: 7px 8px; border-bottom: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 600; font-size: 12px; }
+  .before { color: var(--err); text-decoration: line-through; }
+  .after { color: var(--ok); }
+  .context { color: var(--muted); max-width: 320px; }
+  .approved { font-size: 12px; color: var(--muted); margin-top: 8px; overflow-wrap: anywhere; }
+  .approved a { color: var(--blue); }
+  .approved code { font-size: 11px; color: var(--ink); }
+  @media (max-width: 800px) { .layout { grid-template-columns: 1fr; grid-template-rows: auto 70vh; } aside { border-right: none; border-bottom: 1px solid var(--line); } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Стенд модуля СМК · редактор документов</h1>
+  <span class="hint">Демонстрация: портал здесь условный, права задаются вручную</span>
+</header>
+<div class="layout">
+  <aside>
+    <section>
+      <h2>Документ</h2>
+      <select id="document"></select>
+      <div class="meta" id="document-meta"></div>
+      <div class="buttons">
+        <button id="sample" type="button">Новый пример</button>
+        <button id="upload" type="button">Загрузить DOCX</button>
+        <a class="button" id="download" href="#">Скачать</a>
+        <input id="file" type="file" accept=".docx" hidden>
+      </div>
+    </section>
+    <section>
+      <h2>Статус документа</h2>
+      <select id="status"></select>
+    </section>
+    <section>
+      <h2>Пользователь</h2>
+      <select id="user"></select>
+      <label for="role">Роль в документе</label>
+      <select id="role"></select>
+      <div class="row">
+        <div><label for="round">Круг</label><input id="round" type="number" min="0" value="1"></div>
+        <div><label for="stage">Этап</label><input id="stage" type="number" min="1" value="1"></div>
+      </div>
+      <label for="lang">Язык пользователя</label>
+      <select id="lang"><option value="ru">Русский</option><option value="kk">Қазақша</option></select>
+    </section>
+    <button class="primary" id="open" type="button">Открыть в редакторе</button>
+    <div class="message" id="message"></div>
+    <div class="policy" id="policy"></div>
+    <button id="report" type="button">Отчёт рецензирования</button>
+    <section>
+      <h2>Смена статуса и утверждение</h2>
+      <div class="buttons">
+        <button id="close-sessions" type="button">Закрыть сеансы</button>
+        <button id="approve" type="button">Подготовить к утверждению</button>
+      </div>
+      <div class="approved" id="approved"></div>
+    </section>
+    <details open>
+      <summary>Сценарий проверки</summary>
+      <ol>
+        <li>Сидорова, «Черновик» — правит текст свободно.</li>
+        <li>«На согласовании», Петров (этап 1) — правки становятся предложениями, оставьте комментарий.</li>
+        <li>Сохраните (Ctrl+S) и откройте «Отчёт рецензирования» — правка с меткой круга и этапа.</li>
+        <li>«На согласовании», Сидорова — только комментарии и ответы.</li>
+        <li>«На утверждении», Нурланов (этап 4) — тоже рецензирование: предложения и комментарии; Сидорова в этом статусе отвечает на комментарии.</li>
+        <li>«Возвращён на доработку», Сидорова — в панели «Рецензирование» принять или отклонить каждую правку: отклонение только с обоснованием, решение видят все участники.</li>
+        <li>«Действует», Сотрудник — чистый текст без пометок.</li>
+        <li>«Закрыть сеансы» — так портал меняет статус: все, у кого открыт документ, отключаются, файл сохраняется.</li>
+        <li>«Подготовить к утверждению» — после решения по всем правкам: исходник без комментариев и блокировок, PDF с листом согласования и SHA-256.</li>
+      </ol>
+      <p>Двое пользователей одновременно — откройте стенд во второй вкладке.</p>
+    </details>
+  </aside>
+  <main><div id="host"><div class="empty">Выберите документ, статус и пользователя, затем нажмите «Открыть в редакторе»</div></div></main>
+</div>
+<dialog id="report-dialog">
+  <div class="dialog-head"><h3>Отчёт рецензирования</h3><button type="button" id="close-report">Закрыть</button></div>
+  <div class="dialog-body" id="report-body"></div>
+</dialog>
+<script>
+const STATUSES = [
+  ['DRAFT', 'Черновик'], ['ON_REVIEW', 'На согласовании'], ['ON_APPROVAL', 'На утверждении'],
+  ['RETURNED', 'Возвращён на доработку'], ['ACTIVE', 'Действует'], ['ON_REVISION', 'На пересмотре'],
+  ['ARCHIVED', 'Архив'], ['CANCELLED', 'Отменён']
+];
+const ROLES = [
+  ['OWNER', 'Владелец (автор)'], ['REVIEWER', 'Согласующий на текущем этапе'], ['SIGNER', 'Утверждающий'],
+  ['SUPERVISOR', 'Администратор СМК / нормоконтроль / аудит'], ['READER', 'Сотрудник области применения']
+];
+const USERS = [
+  {id: 'u-100', name: 'Сидорова А. А.', note: 'владелец', role: 'OWNER'},
+  {id: 'u-201', name: 'Петров П. П.', note: 'согласующий, этап 1', role: 'REVIEWER', stage: 1},
+  {id: 'u-202', name: 'Иванов И. И.', note: 'согласующий, этап 2', role: 'REVIEWER', stage: 2},
+  {id: 'u-300', name: 'Ахметова Г. К.', note: 'нормоконтроль, этап 3', role: 'REVIEWER', stage: 3},
+  {id: 'u-001', name: 'Нурланов Б. Б.', note: 'утверждающий, этап 4', role: 'SIGNER', stage: 4},
+  {id: 'u-900', name: 'Администратор СМК', note: 'администратор', role: 'SUPERVISOR'},
+  {id: 'u-500', name: 'Сейткали Д. М.', note: 'сотрудник', role: 'READER'}
+];
+const MODES = {
+  EDIT: ['Правка текста', 'Черновик: изменения вносятся напрямую.'],
+  DECIDE: ['Правка и решение по правкам', 'Автор принимает или отклоняет предложения рецензентов.'],
+  REVIEW: ['Рецензирование', 'Любая правка — предложение с меткой круга и этапа; принять или отклонить нельзя.'],
+  COMMENT: ['Только комментарии', 'Автор на маршруте: отвечает на замечания, текст не меняет.'],
+  VIEW: ['Просмотр', 'Документ открыт только для чтения.']
+};
+const TYPES = {INSERT: 'Вставка', DELETE: 'Удаление', REPLACE: 'Замена', FORMAT: 'Оформление'};
+
+const $ = id => document.getElementById(id);
+const fill = (select, items) => select.replaceChildren(...items.map(([value, text]) => new Option(text, value)));
+let editor = null;
+let apiLoaded = null;
+let documents = [];
+
+fill($('status'), STATUSES);
+fill($('role'), ROLES);
+fill($('user'), USERS.map((user, index) => [index, `${user.name} — ${user.note}`]));
+
+function applyUser() {
+  const user = USERS[$('user').value];
+  $('role').value = user.role;
+  if (user.stage) $('stage').value = user.stage;
+}
+$('user').addEventListener('change', applyUser);
+applyUser();
+
+function say(text, kind = 'info') {
+  const box = $('message');
+  box.textContent = text;
+  box.className = text ? `message visible ${kind}` : 'message';
+}
+
+function formatTime(iso) {
+  return iso ? new Date(iso).toLocaleString('ru-RU', {day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit'}) : '';
+}
+
+async function json(response) {
+  const body = await response.json();
+  if (!response.ok) {
+    const details = Array.isArray(body.details) ? ': ' + body.details.join('; ') : '';
+    throw new Error((body.message || body.error || 'Ошибка') + details);
+  }
+  return body;
+}
+
+async function loadDocuments(selectId) {
+  const previous = documents.map(doc => doc.id + doc.title).join();
+  documents = await json(await fetch('/api/documents'));
+  const current = selectId || $('document').value;
+  // Refill only when the list changed, so the periodic refresh does not close an open dropdown.
+  if (selectId || documents.map(doc => doc.id + doc.title).join() !== previous) {
+    fill($('document'), documents.map(doc => [doc.id, doc.title]));
+    if (documents.some(doc => doc.id === current)) $('document').value = current;
+  }
+  showMeta();
+}
+
+function showMeta() {
+  const doc = documents.find(item => item.id === $('document').value);
+  if (!doc) return;
+  $('download').href = `/download/${doc.id}`;
+  $('document-meta').textContent = `Ревизия файла ${doc.revision}` + (doc.lastSave ? ` · сохранён ${formatTime(doc.lastSave.at)}` : ' · ещё не сохранялся');
+  showApproved(doc);
+}
+$('document').addEventListener('change', showMeta);
+
+function showApproved(doc) {
+  const box = $('approved');
+  box.replaceChildren();
+  if (!doc.approved) return;
+  const {at, revision, source, pdf, removed} = doc.approved;
+  const link = (href, text) => Object.assign(document.createElement('a'), {href, text, target: '_blank'});
+  const hash = value => Object.assign(document.createElement('code'), {textContent: value});
+  box.append(
+    `Утверждаемая редакция (ревизия ${revision}, ${formatTime(at)}): `, link(`/approved/${doc.id}.pdf`, 'PDF'), ' · ', link(`/approved/${doc.id}.docx`, 'исходник DOCX'),
+    document.createElement('br'), 'SHA-256 PDF: ', hash(pdf.sha256),
+    document.createElement('br'), 'SHA-256 DOCX: ', hash(source.sha256),
+    document.createElement('br'), `Убрано из исходника: комментариев ${removed.comments}, блокировок ${removed.locks}`
+  );
+}
+
+function sessionText(closed) {
+  if (closed.session === 'none') return 'Открытых сеансов не было, файл уже актуален.';
+  const users = closed.users.length ? `отключено пользователей: ${closed.users.length}` : 'пользователей не было';
+  return `Сеанс закрыт (${users}), ` + (closed.savedStatus === 2 ? 'изменения сохранены' : 'изменений не было') + '.';
+}
+
+$('close-sessions').addEventListener('click', async () => {
+  say('Закрываю сеансы и жду сохранения…');
+  try {
+    const closed = await json(await fetch(`/api/close?id=${encodeURIComponent($('document').value)}`, {method: 'POST'}));
+    await loadDocuments();
+    say(sessionText(closed) + ` Ревизия файла ${closed.revision}.`);
+  } catch (err) {
+    say(err.message, 'error');
+  }
+});
+
+$('approve').addEventListener('click', async () => {
+  say('Закрываю сеансы, сохраняю финальную редакцию и формирую PDF…');
+  try {
+    const response = await fetch(`/api/approve?id=${encodeURIComponent($('document').value)}`, {method: 'POST'});
+    const body = await response.json();
+    if (response.status === 409) {
+      say(`Подписание недоступно: правок без решения — ${body.details.openSuggestions}. Документ нужно вернуть автору, чтобы он принял или отклонил правки.`, 'error');
+      return;
+    }
+    if (!response.ok) throw new Error(body.message || 'Ошибка');
+    await loadDocuments();
+    say(sessionText(body.closed) + ' PDF для подписи сформирован.');
+  } catch (err) {
+    say(err.message, 'error');
+  }
+});
+
+$('sample').addEventListener('click', async () => {
+  const doc = await json(await fetch('/api/documents/sample', {method: 'POST'}));
+  await loadDocuments(doc.id);
+  say('Создан новый экземпляр примера.');
+});
+$('upload').addEventListener('click', () => $('file').click());
+$('file').addEventListener('change', async () => {
+  const file = $('file').files[0];
+  if (!file) return;
+  try {
+    const doc = await json(await fetch(`/api/documents/upload?name=${encodeURIComponent(file.name)}`, {method: 'POST', body: file}));
+    await loadDocuments(doc.id);
+    say(`Загружен «${doc.title}».`);
+  } catch (err) {
+    say(err.message, 'error');
+  }
+  $('file').value = '';
+});
+
+function loadApi(url) {
+  apiLoaded = apiLoaded || new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = url;
+    script.onload = resolve;
+    script.onerror = () => { apiLoaded = null; reject(new Error('Сервер документов недоступен: ' + url)); };
+    document.head.append(script);
+  });
+  return apiLoaded;
+}
+
+function showPolicy(policy) {
+  const [title, text] = MODES[policy.mode];
+  const box = $('policy');
+  box.replaceChildren();
+  const strong = document.createElement('b');
+  strong.textContent = `Режим: ${title}`;
+  box.append(strong, document.createTextNode(text + (policy.stamp ? ` Метка в документе: ${policy.stamp}.` : '')));
+  box.className = 'policy visible';
+}
+
+$('open').addEventListener('click', async () => {
+  const user = USERS[$('user').value];
+  say('');
+  $('policy').className = 'policy';
+  try {
+    const result = await json(await fetch('/api/editor-config', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        documentId: $('document').value,
+        user: {id: user.id, name: user.name, lang: $('lang').value},
+        access: {status: $('status').value, role: $('role').value, round: Number($('round').value), stageNo: Number($('stage').value)}
+      })
+    }));
+    await loadApi(result.apiUrl);
+    if (editor) editor.destroyEditor();
+    const placeholder = document.createElement('div');
+    placeholder.id = 'editor';
+    $('host').replaceChildren(placeholder);
+    editor = new DocsAPI.DocEditor('editor', {
+      ...result.config,
+      width: '100%',
+      height: '100%',
+      events: {
+        onDocumentReady: () => say(`Открыт как ${user.name}.`),
+        onError: event => say(`Редактор: ${event.data.errorDescription || event.data.errorCode}`, 'error')
+      }
+    });
+    showPolicy(result.policy);
+  } catch (err) {
+    say(err.message, 'error');
+  }
+});
+
+function cell(row, text, className) {
+  const td = row.insertCell();
+  td.textContent = text || '';
+  if (className) td.className = className;
+  return td;
+}
+
+function stageText(author) {
+  if (!author.stamp) return '—';
+  return author.stageNo ? `круг ${author.round}, этап ${author.stageNo}` : `круг ${author.round}, автор`;
+}
+
+function table(headers) {
+  const element = document.createElement('table');
+  const head = element.createTHead().insertRow();
+  headers.forEach(text => { const th = document.createElement('th'); th.textContent = text; head.append(th); });
+  return element;
+}
+
+$('report').addEventListener('click', async () => {
+  try {
+    const report = await json(await fetch(`/api/report?id=${encodeURIComponent($('document').value)}`, {method: 'POST'}));
+    const body = $('report-body');
+    body.replaceChildren();
+    const chips = document.createElement('div');
+    chips.className = 'chips';
+    const chip = (text, warn) => { const span = document.createElement('span'); span.className = warn ? 'chip warn' : 'chip'; span.textContent = text; chips.append(span); };
+    chip(`Правок без решения: ${report.summary.openSuggestions}`, report.summary.openSuggestions > 0);
+    chip(`Комментариев: ${report.summary.comments}`);
+    chip(`Открытых веток: ${report.summary.unresolvedThreads}`, report.summary.unresolvedThreads > 0);
+    chip(`Ревизия файла ${report.revision}` + (report.lastSave ? `, сохранён ${formatTime(report.lastSave.at)}` : ''));
+    const note = document.createElement('p');
+    note.className = 'meta';
+    note.textContent = 'Отчёт строится по сохранённому файлу: нажмите «Сохранить» (Ctrl+S) в редакторе или закройте документ.';
+    body.append(chips, note);
+
+    const suggestions = table(['Тип', 'Автор', 'Круг / этап', 'Было', 'Стало', 'Абзац']);
+    const sBody = suggestions.createTBody();
+    report.suggestions.forEach(item => {
+      const row = sBody.insertRow();
+      cell(row, TYPES[item.type] || item.type);
+      cell(row, item.author.name + (item.author.userId ? ` (${item.author.userId})` : ''));
+      cell(row, stageText(item.author));
+      cell(row, item.textBefore, 'before');
+      cell(row, item.textAfter, item.type === 'FORMAT' ? '' : 'after');
+      cell(row, item.anchor.context, 'context');
+    });
+    if (!report.suggestions.length) cell(sBody.insertRow(), 'Правок нет').colSpan = 6;
+
+    const comments = table(['Автор', 'Круг / этап', 'Комментарий', 'К фрагменту', 'Ответ на', 'Решён']);
+    const cBody = comments.createTBody();
+    report.comments.forEach(item => {
+      const row = cBody.insertRow();
+      cell(row, item.author.name);
+      cell(row, stageText(item.author));
+      cell(row, item.text);
+      cell(row, item.anchorText, 'context');
+      cell(row, item.parentId ? `№ ${item.parentId}` : '');
+      cell(row, item.resolved ? 'да' : 'нет');
+    });
+    if (!report.comments.length) cell(cBody.insertRow(), 'Комментариев нет').colSpan = 6;
+
+    const h4 = text => { const h = document.createElement('h2'); h.textContent = text; return h; };
+    body.append(h4('Правки'), suggestions, h4('Комментарии'), comments);
+    $('report-dialog').showModal();
+  } catch (err) {
+    say(err.message, 'error');
+  }
+});
+$('close-report').addEventListener('click', () => $('report-dialog').close());
+
+loadDocuments().catch(err => say(err.message, 'error'));
+setInterval(() => loadDocuments().catch(() => {}), 5000);
+</script>
+</body>
+</html>

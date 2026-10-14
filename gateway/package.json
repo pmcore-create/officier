@@ -1,0 +1,15 @@
+{
+  "name": "officier-qms-gateway",
+  "version": "0.2.0",
+  "private": true,
+  "description": "QMS integration API of the Officier document server for the corporate portal",
+  "license": "AGPL-3.0-only",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node --test \"test/*.test.cjs\""
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

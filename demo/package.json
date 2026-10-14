@@ -1,0 +1,14 @@
+{
+  "name": "officier-qms-demo",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Demo portal for showing the QMS editor integration; not for production",
+  "license": "AGPL-3.0-only",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

@@ -1,0 +1,61 @@
+# Production stack of the QMS editor: document server + QMS gateway from release images, no builds.
+#   docker load -i images/officier-0.2.0.tar.gz
+#   docker load -i images/officier-qms-gateway-0.2.0.tar.gz
+#   cp .env.example .env   # fill in, see README.md
+#   docker compose up -d
+# Keep in step with the development compose.yaml in the repository root.
+services:
+  officier:
+    image: ${OFFICIER_IMAGE:-officier:0.2.0}
+    platform: linux/amd64
+    restart: unless-stopped
+    ports:
+      # The HTTPS reverse proxy (nginx-officier.conf) connects here.
+      - "${OFFICIER_BIND:-127.0.0.1}:${OFFICIER_PORT:-8080}:80"
+    environment:
+      JWT_ENABLED: "true"
+      JWT_SECRET: "${JWT_SECRET:?Set JWT_SECRET in .env before starting}"
+      # The portal and its files live in the corporate network (private addresses).
+      # The server only fetches URLs from configs signed with JWT_SECRET.
+      ALLOW_PRIVATE_IP_ADDRESS: "${OFFICIER_ALLOW_PRIVATE_IP:-true}"
+      # nginx on every core; worker_connections follows the open-files limit below.
+      NGINX_WORKER_PROCESSES: "auto"
+      # Empty: 60% of the container memory.
+      DOCSERVICE_MAX_HEAP_MB: "${OFFICIER_DOCSERVICE_HEAP_MB:-}"
+    # One open editor is one WebSocket: lift the default 1024 open files.
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
+    shm_size: 1gb
+    # Unsaved co-editing changes live in DocService memory. On stop the container saves open
+    # documents (documentserver-prepare4shutdown.sh); Docker's default 10 s is too short.
+    stop_grace_period: 2m
+    volumes:
+      - data:/var/www/onlyoffice/Data
+      - cache:/var/lib/onlyoffice
+      - logs:/var/log/onlyoffice
+      # Fonts added here appear in the editors after a container restart.
+      - fonts:/usr/share/fonts/truetype/custom
+  qms-gateway:
+    image: ${OFFICIER_GATEWAY_IMAGE:-officier-qms-gateway:0.2.0}
+    restart: unless-stopped
+    depends_on:
+      - officier
+    ports:
+      # Only the portal backend calls the gateway: internal interface, never published to browsers.
+      - "${GATEWAY_BIND:-127.0.0.1}:${GATEWAY_PORT:-8081}:8081"
+    environment:
+      OFFICIER_JWT_SECRET: "${JWT_SECRET:?Set JWT_SECRET in .env before starting}"
+      GATEWAY_API_KEY: "${GATEWAY_API_KEY:?Set GATEWAY_API_KEY in .env before starting}"
+      # Address of the document server as the browser sees it (api.js URL returned to the portal).
+      OFFICIER_PUBLIC_URL: "${OFFICIER_PUBLIC_URL:?Set OFFICIER_PUBLIC_URL (https://docs...) in .env}"
+      # Server-to-server: Command API and PDF conversion, and the print copy the document server fetches.
+      OFFICIER_INTERNAL_URL: "http://officier"
+      GATEWAY_INTERNAL_URL: "http://qms-gateway:8081"
+      QMS_TIME_ZONE: "${QMS_TIME_ZONE:-Asia/Almaty}"
+volumes:
+  data:
+  cache:
+  logs:
+  fonts:

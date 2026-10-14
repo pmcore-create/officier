@@ -1,1 +1,1 @@
-{"name":"officier-container-smoke","private":true,"type":"module","scripts":{"test":"node smoke.mjs"},"dependencies":{"playwright":"1.63.0"}}
+{"name":"officier-container-smoke","private":true,"type":"module","scripts":{"test":"node smoke.mjs","test:qms":"node qms.mjs"},"dependencies":{"playwright":"1.63.0"}}

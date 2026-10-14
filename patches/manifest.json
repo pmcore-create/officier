@@ -56,6 +56,15 @@
               "after": "a94d27c51116ffff57cb7aa8238d3d249dc247e68a78935e369943fcdccc4170"
             }
           }
+        },
+        {
+          "patch": "patches/server/0006-parallel-embedded-converter.patch",
+          "files": {
+            "DocService/sources/embeddedConverter.js": {
+              "before": "8bb1c7c123fdf2e4b31de221e018cfb652f2adaf4a997cfdb7adb5e68ca36c76",
+              "after": "4bcf5de55ac35b15be8e22a65c893c6bd1327ab967becb40aa4d8c06e2ddfbf9"
+            }
+          }
         }
       ]
     }

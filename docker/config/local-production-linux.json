@@ -1,0 +1,22 @@
+{
+  "services": {
+    "CoAuthoring": {
+      "expire": {
+        "sessionidle": "0"
+      },
+      "editor": {
+        "maxChangesSize": "80MB"
+      }
+    }
+  },
+  "FileConverter": {
+    "converter": {
+      "inputLimits": [
+        {"type": "docx;dotx;docm;dotm", "zip": {"uncompressed": "250MB", "template": "*.xml"}},
+        {"type": "xlsx;xltx;xlsm;xltm", "zip": {"uncompressed": "500MB", "template": "*.xml"}},
+        {"type": "pptx;ppsx;potx;pptm;ppsm;potm", "zip": {"uncompressed": "250MB", "template": "*.xml"}},
+        {"type": "vsdx;vstx;vssx;vsdm;vstm;vssm", "zip": {"uncompressed": "250MB", "template": "*.xml"}}
+      ]
+    }
+  }
+}
