@@ -6,6 +6,8 @@ import {execFileSync} from 'node:child_process';
 import {chromium} from 'playwright';
 
 const base = 'http://127.0.0.1:8080';
+// Same FIXTURE_PORT convention as qms.mjs: 8090 may be taken on the build machine.
+const fixturePort = Number(process.env.FIXTURE_PORT || 8090);
 const secret = process.env.JWT_SECRET;
 assert(secret, 'JWT_SECRET is required');
 const sign = body => {
@@ -56,7 +58,7 @@ const key = 'officier-smoke-' + Date.now();
 let saved = null;
 let callbackError = null;
 function config(view = false) {
-  const body = {documentType: 'word', document: {key: view ? key + '-view' : key, fileType: 'docx', title: 'Officier smoke.docx', url: `http://host.docker.internal:8090/${view ? 'saved' : 'document'}.docx`, permissions: {edit: !view}}, editorConfig: {mode: view ? 'view' : 'edit', lang: 'en', user: {id: 'smoke-user', name: 'Smoke Test'}, callbackUrl: 'http://host.docker.internal:8090/callback', customization: {forcesave: true}}, width: '100%', height: '100%'};
+  const body = {documentType: 'word', document: {key: view ? key + '-view' : key, fileType: 'docx', title: 'Officier smoke.docx', url: `http://host.docker.internal:${fixturePort}/${view ? 'saved' : 'document'}.docx`, permissions: {edit: !view}}, editorConfig: {mode: view ? 'view' : 'edit', lang: 'en', user: {id: 'smoke-user', name: 'Smoke Test'}, callbackUrl: `http://host.docker.internal:${fixturePort}/callback`, customization: {forcesave: true}}, width: '100%', height: '100%'};
   return {...body, token: sign(body)};
 }
 const fixture = createServer(async (req, res) => {
@@ -83,7 +85,7 @@ const fixture = createServer(async (req, res) => {
     res.end(`<!doctype html><html><style>html,body,#host{margin:0;width:100%;height:100%}</style><div id="host"></div><script src="${base}/web-apps/apps/api/documents/api.js"></script><script>window.ready=false;window.errors=[];const config=${JSON.stringify(config(req.url === '/view'))};config.events={onDocumentReady:()=>window.ready=true,onError:e=>window.errors.push(e.data)};window.instance=new DocsAPI.DocEditor('host',config);</script></html>`);
   } catch (error) {callbackError = error; res.writeHead(500); res.end(String(error));}
 });
-await new Promise(resolve => fixture.listen(8090, '0.0.0.0', resolve));
+await new Promise(resolve => fixture.listen(fixturePort, '0.0.0.0', resolve));
 const browser = await chromium.launch({headless: true});
 try {
   const probe = await browser.newPage();
@@ -126,7 +128,7 @@ try {
 
   const page = await browser.newPage({viewport: {width: 1440, height: 1000}});
   page.on('pageerror', error => console.log('Browser error:', error.message));
-  await page.goto('http://127.0.0.1:8090/');
+  await page.goto(`http://127.0.0.1:${fixturePort}/`);
   await page.waitForFunction(() => window.ready || window.errors.length, null, {timeout: 180000});
   assert.deepEqual(await page.evaluate(() => window.errors), []);
   assert.equal(await page.evaluate(() => window.ready), true);
@@ -153,11 +155,13 @@ try {
   console.log('Branding checks passed:', branding.title);
   await editor.evaluate(() => {window.Asc.editor.asc_AddText('OfficierSavedMarker'); window.Asc.editor.asc_Save();});
   await page.screenshot({path: new URL('./smoke.png', import.meta.url).pathname});
+  // Force save (status 6) must land before the editor closes: on a slow (emulated) host closing
+  // right away drops the unsent change and the server reports "closed without changes" (status 4).
+  await until(async () => {if (callbackError) throw callbackError; return !!saved;}, 180000);
   // Closing the editor exercises the ordinary save callback path.
   await page.evaluate(() => window.instance.destroyEditor());
-  await until(async () => {if (callbackError) throw callbackError; return !!saved;}, 180000);
   execFileSync('python3', ['-c', "import zipfile; z=zipfile.ZipFile('saved.docx'); assert b'OfficierSavedMarker' in z.read('word/document.xml')"], {cwd: import.meta.dirname});
-  await page.goto('http://127.0.0.1:8090/view');
+  await page.goto(`http://127.0.0.1:${fixturePort}/view`);
   await page.waitForFunction(() => window.ready, null, {timeout: 180000});
   const viewer = page.frames().find(frame => frame.url().includes('/documenteditor/'));
   assert.equal(await viewer.evaluate(() => window.Asc.editor.isViewMode), true);
