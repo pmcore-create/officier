@@ -10,3 +10,5 @@ __pycache__/
 /release/
 /docker/source/*.tar.gz
 /demo/data/
+# Local caches of editor and design tools.
+.impeccable/

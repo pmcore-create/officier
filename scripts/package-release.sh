@@ -32,7 +32,7 @@ echo "== source archive"
 archive=docker/source/officier-source.tar.gz
 tmp="$(mktemp)"
 tar --sort=name --mtime='2026-01-01 00:00Z' --owner=0 --group=0 --numeric-owner \
-  --exclude='./.git' --exclude='*/.git' --exclude='node_modules' --exclude='__pycache__' --exclude='*.log' \
+  --exclude='./.git' --exclude='*/.git' --exclude='node_modules' --exclude='__pycache__' --exclude='*.log' --exclude='.impeccable' \
   --exclude='./release' --exclude='./.env' --exclude='./demo/data' --exclude="./$archive" \
   --exclude='./docker/smoke/*.png' --exclude='./docker/smoke/*.pdf' --exclude='./docker/smoke/saved*.docx' \
   --exclude='./docker/smoke/approved*.docx' --exclude='./docker/smoke/document.docx' \
