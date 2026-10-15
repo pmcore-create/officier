@@ -11,7 +11,7 @@ jobs:
             node-version: 22
       - name: run markdownlint linter
         run: |
-          npm install -g markdownlint-cli
+          npm install -g markdownlint-cli@0.39.0
           markdownlint CHANGELOG.md ROADMAP.md
   spellchecker:
     runs-on: ubuntu-latest
