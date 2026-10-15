@@ -37,7 +37,7 @@ ARG SOURCE_REVISION
 ARG OFFICIER_VERSION=0.2.0
 LABEL org.opencontainers.image.title="Officier" \
       org.opencontainers.image.description="ONLYOFFICE 9.4.0 Community with Officier source-built server and customization patches" \
-      org.opencontainers.image.source="https://github.com/baken667/officier" \
+      org.opencontainers.image.source="https://github.com/pmcore-create/officier" \
       org.opencontainers.image.revision="${SOURCE_REVISION}" \
       org.opencontainers.image.version="${OFFICIER_VERSION}" \
       org.opencontainers.image.licenses="AGPL-3.0-only" \

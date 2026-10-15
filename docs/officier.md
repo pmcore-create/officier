@@ -2,7 +2,7 @@
 
 ## Основа
 
-- Форк: <https://github.com/baken667/officier>.
+- Форк: <https://github.com/pmcore-create/officier>.
 - Upstream: <https://github.com/ONLYOFFICE/DocumentServer>.
 - Исходная ревизия: `f580eb58439432310943ece02c9730c6a21365e7` (`master`).
 - Дата подготовки форка: 2026-09-09.
@@ -15,7 +15,7 @@ submodules. Подготовка исходников сама по себе н�
 ## Получение исходников
 
 ```sh
-git clone git@github.com:baken667/officier.git
+git clone git@github.com:pmcore-create/officier.git
 cd officier
 git remote add upstream https://github.com/ONLYOFFICE/DocumentServer.git
 bash scripts/bootstrap.sh
@@ -87,7 +87,7 @@ bash scripts/bootstrap.sh
 
 Инструкция upstream по сборке доступна из раздела **How to build** в
 [исходном README](../Readme.md#how-to-build). Build tools и упаковка находятся
-в отдельных репозиториях ONLYOFFICE; готовый контейнер Officier публикуется в GHCR как `ghcr.io/baken667/officier`.
+в отдельных репозиториях ONLYOFFICE; готовый контейнер Officier публикуется в GHCR как `ghcr.io/pmcore-create/officier`.
 
 Для обновления основы:
 

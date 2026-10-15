@@ -4,11 +4,11 @@ jobs:
   markdownlint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - name: Use Node.js 18
-        uses: actions/setup-node@v1
+      - uses: actions/checkout@v4
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
         with:
-            node-version: 18
+            node-version: 22
       - name: run markdownlint linter
         run: |
           npm install -g markdownlint-cli
@@ -16,7 +16,7 @@ jobs:
   spellchecker:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - name: setup aspell
         run: sudo apt-get -y update && sudo apt-get -y install aspell aspell-en
       - name: run spellchecker
