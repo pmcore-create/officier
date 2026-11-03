@@ -59,9 +59,27 @@ test('Review panel and comments open with the document for everyone on the route
     const policy = resolvePolicy({status, role, round: 1, stageNo: 1});
     assert.deepEqual([policy.reviewPanel, policy.customization.officier.openComments], [side, comments], `${status}/${role}`);
   }
-  for (const [status, role] of [['DRAFT', 'OWNER'], ['ACTIVE', 'READER'], ['ACTIVE', 'SUPERVISOR']]) {
+});
+
+test('Review panel opens off the route wherever the review marks are shown', () => {
+  const cases = [
+    // A draft after a return or a new version made from a reviewed file: the owner edits beside the panel.
+    ['DRAFT', 'OWNER', 'right'],
+    ['DRAFT', 'SUPERVISOR', 'left'],
+    ['ACTIVE', 'SUPERVISOR', 'left'],
+    ['ON_REVISION', 'SUPERVISOR', 'left'],
+    // Previous files of a version open as archived for route participants.
+    ['ARCHIVED', 'SUPERVISOR', 'left'],
+    ['CANCELLED', 'SUPERVISOR', 'left']
+  ];
+  for (const [status, role, side] of cases) {
     const policy = resolvePolicy({status, role});
-    assert.deepEqual([policy.reviewPanel, policy.customization.officier.openComments], [null, false], `${status}/${role}`);
+    // Nobody answers comments off the route, so the native comments panel stays closed.
+    assert.deepEqual([policy.reviewPanel, policy.customization.officier.openComments], [side, false], `${status}/${role}`);
+  }
+  for (const status of ['ACTIVE', 'ON_REVISION', 'ARCHIVED', 'CANCELLED']) {
+    const policy = resolvePolicy({status, role: 'READER'});
+    assert.deepEqual([policy.reviewPanel, policy.customization.officier.openComments], [null, false], `${status}/READER`);
   }
 });
 
