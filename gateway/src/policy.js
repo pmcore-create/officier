@@ -76,10 +76,14 @@ function resolvePolicy({status, role, round = 0, stageNo, fileType = 'docx'}) {
 
   const definition = MODES[mode];
   const reviewVisible = role !== 'READER';
+  const onRoute = ROUTE_STATUSES.includes(status);
   // Officier review panel (docker/plugins/qms-review*): every change and comment with its author.
+  // It opens wherever the review marks are shown, not only on the route: a draft after a return,
+  // a new version made from a reviewed file and a published version keep their marks, and without
+  // the panel the author of each one is found only by clicking it in the text.
   // The editor has a right side panel only where the text can be changed; elsewhere it goes left.
   let reviewPanel = null;
-  if (reviewVisible && ROUTE_STATUSES.includes(status)) {
+  if (reviewVisible) {
     reviewPanel = definition.permissions.edit || definition.permissions.review ? 'right' : 'left';
   }
   const customization = {
@@ -90,8 +94,8 @@ function resolvePolicy({status, role, round = 0, stageNo, fileType = 'docx'}) {
     },
     comments: reviewVisible,
     // Officier extension (docker/branding/apply.js): the native comments panel opens on the left
-    // when the review panel takes the right side.
-    officier: {openComments: reviewPanel === 'right' && ROUTE_ROLES.includes(role)}
+    // when the review panel takes the right side and the route participants are answering comments.
+    officier: {openComments: reviewPanel === 'right' && onRoute && ROUTE_ROLES.includes(role)}
   };
   return {
     mode,

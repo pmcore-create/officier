@@ -64,9 +64,18 @@ test('Readers get a view-only config without a callback or stamp', () => {
   assert.equal(policy.reviewPanel, null);
 });
 
-test('Review panel is only for documents on the route, docked where the editor has room', () => {
+test('Review panel opens wherever the review marks are shown, docked where the editor has room', () => {
   const draft = buildEditorConfig(request({access: {status: 'DRAFT', role: 'OWNER'}}), settings);
-  assert.equal(draft.config.editorConfig.plugins, undefined);
+  assert.equal(draft.policy.reviewPanel, 'right');
+  assert.deepEqual(draft.config.editorConfig.plugins, {
+    pluginsData: ['https://docs.example.kz/sdkjs-plugins/qms-review/config.json'],
+    autostart: ['asc.{8D3B2A54-0C1E-4F6A-9B7D-2E5F1C3A9D60}']
+  });
+  assert.equal(draft.config.editorConfig.customization.officier.openComments, false);
+  const published = buildEditorConfig(request({document: {callbackUrl: undefined}, access: {status: 'ACTIVE', role: 'SUPERVISOR'}}), settings);
+  assert.equal(published.policy.reviewPanel, 'left');
+  const pdf = buildEditorConfig(request({document: {title: 'Положение.pdf', callbackUrl: undefined}, access: {status: 'DRAFT', role: 'OWNER'}}), settings);
+  assert.deepEqual([pdf.config.editorConfig.plugins, pdf.policy.reviewPanel], [undefined, null]);
   const owner = buildEditorConfig(request({access: {role: 'OWNER'}}), settings);
   assert.equal(owner.policy.reviewPanel, 'left');
   assert.deepEqual(owner.config.editorConfig.plugins, {
