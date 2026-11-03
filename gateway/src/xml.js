@@ -56,4 +56,18 @@ function find(node, name) {
   return null;
 }
 
-module.exports = {parseXml, descendants, find};
+const escapeText = value => value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const escapeAttribute = value => escapeText(value).replace(/"/g, '&quot;');
+
+// Writes a parsed part back. The parser keeps no declaration, comments or CDATA markers: the
+// declaration is written anew, CDATA comes back as escaped text, which OOXML readers treat the same.
+function serializeXml(root) {
+  const write = node => {
+    if (!node.name) return escapeText(node.text);
+    const attrs = Object.entries(node.attrs).map(([key, value]) => ` ${key}="${escapeAttribute(value)}"`).join('');
+    return node.children.length ? `<${node.name}${attrs}>${node.children.map(write).join('')}</${node.name}>` : `<${node.name}${attrs}/>`;
+  };
+  return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n' + root.children.map(write).join('');
+}
+
+module.exports = {parseXml, serializeXml, descendants, find};

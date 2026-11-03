@@ -382,13 +382,17 @@ function extractReview(buffer) {
   suggestions.forEach(item => count(item.author.stamp, 'suggestions'));
   comments.forEach(item => count(item.author.stamp, 'comments'));
   const roots = comments.filter(item => !item.parentId);
+  // The owner's own changes, tracked for the route after a return, are the owner's text: nobody
+  // decides them, the print copy and the approval snapshot accept them (revisions.js).
+  const ownerChanges = suggestions.filter(item => item.author.role === 'OWNER').length;
   return {
     suggestions,
     comments,
     locks,
     decisions,
     summary: {
-      openSuggestions: suggestions.length,
+      openSuggestions: suggestions.length - ownerChanges,
+      ownerChanges,
       comments: comments.length,
       threads: roots.length,
       unresolvedThreads: roots.filter(item => !item.resolved).length,

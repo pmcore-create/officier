@@ -103,6 +103,25 @@ test('Finalize refuses a document with undecided suggestions', async () => {
   assert.deepEqual(Object.keys(body.details.suggestions[0]), ['id', 'type', 'author', 'stamp', 'textBefore', 'textAfter']);
 });
 
+test('The owner\'s own tracked changes are no open suggestions: the frozen source accepts them', async () => {
+  const owner = 'R2.OWNER Сидорова А. А.';
+  const docx = zip({
+    '[Content_Types].xml': '<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"/>',
+    'word/document.xml': `<?xml version="1.0"?><w:document ${W}><w:body><w:p><w:r><w:t xml:space="preserve">Срок </w:t></w:r>` +
+      `<w:del w:id="1" w:author="${owner}" w:date="2026-11-04T08:00:00Z"><w:r><w:delText>10</w:delText></w:r></w:del>` +
+      `<w:ins w:id="2" w:author="${owner}" w:date="2026-11-04T08:00:00Z"><w:r><w:t>15</w:t></w:r></w:ins><w:r><w:t xml:space="preserve"> дней</w:t></w:r></w:p><w:sectPr/></w:body></w:document>`
+  });
+  const report = await (await fetch(settings.gatewayInternalUrl + '/api/v1/review/report', {
+    method: 'POST', headers: {Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/octet-stream'}, body: docx
+  })).json();
+  assert.deepEqual([report.summary.openSuggestions, report.summary.ownerChanges], [0, 1]);
+  const response = await call('/api/v1/finalize', request(docx));
+  assert.equal(response.status, 200);
+  const source = readZip(Buffer.from((await response.json()).source.base64, 'base64')).readText('word/document.xml');
+  assert.match(source, /Срок <\/w:t><\/w:r><w:r><w:t>15<\/w:t><\/w:r><w:r><w:t xml:space="preserve"> дней/);
+  assert.doesNotMatch(source, /w:delText|<w:ins\b/);
+});
+
 test('Finalize validates the card and the approval sheet', async () => {
   const response = await call('/api/v1/finalize', request(cleanDocx(), {approvals: [{name: 'Без решения', date: 'вчера'}], document: {url: 'ftp://x', base64: 'AA==', versionNo: 0}}));
   assert.equal(response.status, 422);
@@ -121,6 +140,25 @@ test('Finalize needs the address under which the document server reaches the gat
   } finally {
     local.close();
   }
+});
+
+test('Version PDF is printed from the copy without review markup', async () => {
+  const response = await fetch(settings.gatewayInternalUrl + '/api/v1/pdf', {
+    method: 'POST', headers: {Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/octet-stream'}, body: reviewedDocx()
+  });
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get('content-type'), 'application/pdf');
+  assert.equal(Buffer.from(await response.arrayBuffer()).toString(), '%PDF-1.7 fake pdf');
+  // Eight tracked changes of route participants (two formatting, one paragraph mark): none decided, all rejected.
+  assert.deepEqual([response.headers.get('x-qms-accepted-changes'), response.headers.get('x-qms-rejected-changes')], ['0', '8']);
+  const conversion = conversions.at(-1);
+  assert.match(conversion.key, /^qmspdf_[0-9a-f]{40}$/);
+  const printed = readZip(conversion.print).readText('word/document.xml');
+  assert.doesNotMatch(printed, /w:delText|<w:ins\b|<w:del\b|срочно/);
+  assert.equal((await fetch(printUrl)).status, 404);
+
+  const notDocx = await fetch(settings.gatewayInternalUrl + '/api/v1/pdf', {method: 'POST', headers: {Authorization: `Bearer ${apiKey}`}, body: 'plain text'});
+  assert.equal(notDocx.status, 422);
 });
 
 test('Closing sessions disconnects everybody, or reports that nothing is open', async () => {

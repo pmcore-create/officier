@@ -59,7 +59,7 @@ function documentKey({id, versionNo, revision}) {
 function buildEditorConfig(request, settings) {
   const {document, user, access} = validate(request);
   const fileType = fileTypeOf(document);
-  const policy = resolvePolicy({...access, fileType});
+  const policy = resolvePolicy({...access, fileType, versionNo: document.versionNo});
   if (policy.editorMode === 'edit' && !document.callbackUrl) {
     throw new GatewayError(422, 'GW-422-INVALID', 'Invalid editor config request', ['document.callbackUrl is required when the user can change the document']);
   }
@@ -101,7 +101,8 @@ function buildEditorConfig(request, settings) {
 
   return {
     config: {...config, token: jwt.sign(config, settings.jwtSecret, settings.tokenTtlSeconds)},
-    policy: {mode: policy.mode, stamp: policy.stamp, readOnly: policy.editorMode === 'view', reviewVisible: policy.reviewVisible, reviewPanel: config.editorConfig.plugins ? policy.reviewPanel : null},
+    policy: {mode: policy.mode, stamp: policy.stamp, readOnly: policy.editorMode === 'view', reviewVisible: policy.reviewVisible, reviewPanel: config.editorConfig.plugins ? policy.reviewPanel : null,
+      trackOwnChanges: !!config.editorConfig.plugins && policy.customization.officier.trackOwnChanges},
     apiUrl: `${settings.publicUrl}/web-apps/apps/api/documents/api.js`
   };
 }

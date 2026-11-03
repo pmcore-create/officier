@@ -4,6 +4,7 @@
 const {GatewayError} = require('./errors');
 const {extractReview} = require('./review');
 const {prepareApproval, sha256} = require('./docx');
+const {printCopy} = require('./revisions');
 const {convertToPdf} = require('./docserver');
 
 const SUGGESTIONS_IN_DETAILS = 20;
@@ -60,11 +61,13 @@ async function finalize(request, settings, {download, publish}) {
   if (review.summary.openSuggestions > 0) {
     throw new GatewayError(409, 'GW-409-OPEN-SUGGESTIONS', `${review.summary.openSuggestions} tracked changes have no decision`, {
       openSuggestions: review.summary.openSuggestions,
-      suggestions: review.suggestions.slice(0, SUGGESTIONS_IN_DETAILS).map(item => ({id: item.id, type: item.type, author: item.author.name, stamp: item.author.stamp, textBefore: item.textBefore, textAfter: item.textAfter}))
+      suggestions: review.suggestions.filter(item => item.author.role !== 'OWNER').slice(0, SUGGESTIONS_IN_DETAILS)
+        .map(item => ({id: item.id, type: item.type, author: item.author.name, stamp: item.author.stamp, textBefore: item.textBefore, textAfter: item.textAfter}))
     });
   }
 
-  const {source, print, removed} = prepareApproval(original, {
+  // What is left tracked are the owner's own changes, shown to the route: the frozen source accepts them.
+  const {source, print, removed} = prepareApproval(printCopy(original).buffer, {
     keepComments: options.keepComments,
     keepLocks: options.keepLocks,
     sheet: {code: document.code.trim(), name: document.name.trim(), versionNo: document.versionNo, approvals, timeZone: settings.timeZone}

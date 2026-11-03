@@ -67,15 +67,49 @@
   function viewer() {
     var main = window.parent.DE && window.parent.DE.getController && window.parent.DE.getController('Main');
     var options = main && main.appOptions || {};
+    var custom = main && main.editorConfig && main.editorConfig.customization || {};
     var user = options.user || {};
     var author = parseAuthor(user.fullname || '');
+    var canDecide = !!options.isEdit && !options.isReviewOnly;
     return {
       id: String(user.id || ''), name: author.name, stamp: author.stamp,
       canLock: !!options.isReviewOnly,
       canUnlockAny: !!options.isEdit && !options.isReviewOnly && options.canEditContentControl !== false,
       // The owner reworking the document: the editor's own accept/reject is off (gateway policy).
-      canDecide: !!options.isEdit && !options.isReviewOnly
+      canDecide: canDecide,
+      // After a return and in a new edition the route sees what the owner changed (gateway policy,
+      // trackOwnChanges). The editor applies review.trackChanges only with permissions.review, which
+      // the owner does not have, so the panel keeps tracking on.
+      trackOwn: canDecide && !!(custom.officier && custom.officier.trackOwnChanges)
     };
+  }
+
+  function isOwnerStamp(stamp) {
+    return /\.OWNER$/.test(stamp || '');
+  }
+
+  function keepTracking(api) {
+    if (!api.asc_IsTrackRevisions()) api.asc_SetLocalTrackRevisions(true);
+  }
+
+  // The owner's changes of an earlier round were seen by the route of that round: accepted when the
+  // owner opens the document again, so the route sees only what changed since its remarks.
+  var settledOwners = {};
+  function acceptEarlierOwn(api, me) {
+    var revisions = api.asc_GetTrackRevisionsReportByAuthors();
+    Object.keys(revisions).forEach(function (raw) {
+      var stamp = parseAuthor(raw).stamp;
+      if (settledOwners[raw] || !isOwnerStamp(stamp) || stamp === me.stamp) return;
+      settledOwners[raw] = true;
+      withoutTracking(api, function () {
+        for (var guard = 0; guard < 1000; guard++) {
+          var left = api.asc_GetTrackRevisionsReportByAuthors()[raw] || [];
+          if (!left.length) return;
+          api.asc_AcceptChanges(left[0]);
+          if ((api.asc_GetTrackRevisionsReportByAuthors()[raw] || []).length >= left.length) return;
+        }
+      });
+    });
   }
 
   function typeName(type) {
@@ -340,15 +374,18 @@
     text = (text || '').trim();
     if (decision === 'REJECTED' && !text) return notify('Укажите обоснование: без него правку отклонить нельзя.', true);
     var decided = 0;
-    for (var i = 0; i < suggestion.pieces.length; i++) {
-      var piece = suggestion.pieces[i];
-      var before = matchingChanges(api, author.raw, piece);
-      if (!before.length) break;
-      if (decision === 'ACCEPTED') api.asc_AcceptChanges(before[0]);
-      else api.asc_RejectChanges(before[0]);
-      if (matchingChanges(api, author.raw, piece).length >= before.length) break;
-      decided++;
-    }
+    // The owner's text is tracked after a return: the decision itself must not become a change.
+    withoutTracking(api, function () {
+      for (var i = 0; i < suggestion.pieces.length; i++) {
+        var piece = suggestion.pieces[i];
+        var before = matchingChanges(api, author.raw, piece);
+        if (!before.length) break;
+        if (decision === 'ACCEPTED') api.asc_AcceptChanges(before[0]);
+        else api.asc_RejectChanges(before[0]);
+        if (matchingChanges(api, author.raw, piece).length >= before.length) break;
+        decided++;
+      }
+    });
     pending = null;
     if (!decided) {
       notify('Не удалось: правку уже обработали или этот абзац сейчас правит другой пользователь.', true);
@@ -382,6 +419,8 @@
     tick++;
     var present = {};
     state.authors.forEach(function (author) {
+      // The owner's own changes need no decision: retyping them is ordinary editing.
+      if (isOwnerStamp(author.stamp)) return;
       author.suggestions.forEach(function (suggestion) {
         present[suggestion.key] = true;
         if (!known[suggestion.key]) known[suggestion.key] = {author: {raw: author.raw, name: author.name, stage: author.stage, color: author.color}, suggestion: suggestion, seen: tick};
@@ -470,16 +509,22 @@
       return;
     }
     authors.forEach(function (author) {
+      var owner = isOwnerStamp(author.stamp);
       var block = element('section', 'author');
       var head = element('div', 'author-head');
       var swatch = element('span', 'swatch');
       swatch.style.background = author.color;
       var title = element('div', 'title');
       title.append(element('div', 'name', author.name));
-      var counts = 'правок ' + author.suggestions.length + ' · комментариев ' + author.comments.length;
+      var counts = (owner ? 'изменений ' : 'правок ') + author.suggestions.length + ' · комментариев ' + author.comments.length;
       title.append(element('div', 'stage', author.stage ? author.stage + ' · ' + counts : counts));
       head.append(swatch, title);
       block.append(head);
+      if (owner && author.suggestions.length) {
+        block.append(element('div', 'hint', author.stamp === me.stamp && me.canDecide
+          ? 'Ваши изменения после возврата: согласующие увидят их в тексте цветом, решать по ним не нужно.'
+          : 'Что изменил автор документа: в тексте выделено его цветом.'));
+      }
       author.comments.forEach(function (note) {
         var row = element('div', 'change note');
         row.style.borderLeftColor = author.color;
@@ -501,7 +546,7 @@
         if (suggestion.context) row.append(element('div', 'context', suggestion.context));
         row.addEventListener('click', function () { goTo(author.raw, first.index); });
         block.append(row);
-        if (me.canDecide) block.append(decisionControls(author, suggestion));
+        if (me.canDecide && !owner) block.append(decisionControls(author, suggestion));
       });
       list.append(block);
     });
@@ -567,10 +612,14 @@
   }
 
   function render(state) {
-    var suggestions = state.authors.reduce(function (sum, author) { return sum + author.suggestions.length; }, 0);
+    var count = function (owner) {
+      return state.authors.reduce(function (sum, author) { return isOwnerStamp(author.stamp) === owner ? sum + author.suggestions.length : sum; }, 0);
+    };
+    var suggestions = count(false);
+    var ownChanges = count(true);
     var comments = state.authors.reduce(function (sum, author) { return sum + author.comments.length; }, 0);
     window.document.getElementById('summary').textContent = 'Правок без решения: ' + suggestions + ' · комментариев: ' + comments +
-      (state.decisions.length ? ' · решений: ' + state.decisions.length : '');
+      (ownChanges ? ' · изменений автора: ' + ownChanges : '') + (state.decisions.length ? ' · решений: ' + state.decisions.length : '');
     window.document.getElementById('lock').classList.toggle('hidden', !state.me.canLock);
     var message = window.document.getElementById('message');
     window.document.getElementById('actions').classList.toggle('hidden', !state.me.canLock && message.classList.contains('hidden'));
@@ -588,8 +637,13 @@
     subscribe(api);
     var state;
     try {
+      var me = viewer();
+      if (me.trackOwn) {
+        keepTracking(api);
+        acceptEarlierOwn(api, me);
+      }
       var collected = collectAuthors(api);
-      state = {authors: collected.authors, decisions: collected.decisions, locks: collectLocks(api), me: viewer(), orphans: []};
+      state = {authors: collected.authors, decisions: collected.decisions, locks: collectLocks(api), me: me, orphans: []};
       if (state.me.canDecide) state.orphans = orphans(state);
     } catch (err) {
       return; // the document is being rebuilt; the next tick will succeed

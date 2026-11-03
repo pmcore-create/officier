@@ -20,6 +20,19 @@ test('Owner edits the draft and decides on suggestions after a return', () => {
   assert.equal(returned.stamp, 'R2.OWNER');
 });
 
+test('The owner\'s changes are tracked where the route has to see them', () => {
+  const tracked = context => resolvePolicy(context).customization.officier.trackOwnChanges;
+  // After a return, and in a new edition of a published document.
+  assert.equal(tracked({status: 'RETURNED', role: 'OWNER', round: 2}), true);
+  assert.equal(tracked({status: 'DRAFT', role: 'OWNER', round: 1, versionNo: 2}), true);
+  assert.equal(tracked({status: 'DRAFT', role: 'OWNER', round: 3}), true);
+  // A first draft has nothing to compare with; nobody else changes text without review mode.
+  assert.equal(tracked({status: 'DRAFT', role: 'OWNER', round: 1, versionNo: 1}), false);
+  assert.equal(tracked({status: 'ON_REVIEW', role: 'REVIEWER', round: 2, stageNo: 1, versionNo: 2}), false);
+  assert.equal(tracked({status: 'ON_REVIEW', role: 'OWNER', round: 2, versionNo: 2}), false);
+  assert.equal(tracked({status: 'DRAFT', role: 'OWNER', round: 2, versionNo: 2, fileType: 'pdf'}), false);
+});
+
 test('Route participant reviews only in track changes, the owner only comments meanwhile', () => {
   const reviewer = resolvePolicy({status: 'ON_REVIEW', role: 'REVIEWER', round: 2, stageNo: 3});
   assert.equal(reviewer.mode, 'REVIEW');

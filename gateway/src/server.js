@@ -7,6 +7,7 @@ const {buildEditorConfig} = require('./editorConfig');
 const {extractReview} = require('./review');
 const {closeSessions} = require('./sessions');
 const {finalize} = require('./finalize');
+const {printPdf} = require('./pdf');
 
 const JSON_LIMIT = 1024 * 1024;
 const DOCX_LIMIT = 60 * 1024 * 1024; // QMS source files are limited to 50 MB
@@ -148,6 +149,12 @@ function createServer(settings) {
       }
       if (req.method === 'POST' && path === '/api/v1/finalize') {
         return send(res, 200, await finalize(await readJson(req, FINALIZE_JSON_LIMIT), settings, {download, publish: store.publish}));
+      }
+      if (req.method === 'POST' && path === '/api/v1/pdf') {
+        const {pdf, accepted, rejected} = await printPdf(await reviewSource(req), settings, {publish: store.publish});
+        res.writeHead(200, {'Content-Type': 'application/pdf', 'Content-Length': pdf.length, 'Cache-Control': 'no-store',
+          'X-QMS-Accepted-Changes': accepted, 'X-QMS-Rejected-Changes': rejected});
+        return res.end(pdf);
       }
       throw new GatewayError(404, 'GW-404', 'Not found');
     } catch (err) {

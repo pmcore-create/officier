@@ -41,6 +41,7 @@ test('Comments keep threads, anchors and authors', () => {
   ]);
   assert.deepEqual(summary, {
     openSuggestions: 5,
+    ownerChanges: 0,
     comments: 2,
     threads: 1,
     unresolvedThreads: 1,
@@ -73,7 +74,7 @@ test('Fragment locks report who locked what and on which stage', () => {
 
 test('A clean document has nothing open', () => {
   const docx = zip({'word/document.xml': '<w:document xmlns:w="w"><w:body><w:p><w:r><w:t>Текст</w:t></w:r></w:p></w:body></w:document>'});
-  assert.deepEqual(extractReview(docx).summary, {openSuggestions: 0, comments: 0, threads: 0, unresolvedThreads: 0, locks: 0, decisions: {accepted: 0, rejected: 0}, byStamp: {}});
+  assert.deepEqual(extractReview(docx).summary, {openSuggestions: 0, ownerChanges: 0, comments: 0, threads: 0, unresolvedThreads: 0, locks: 0, decisions: {accepted: 0, rejected: 0}, byStamp: {}});
 });
 
 test('Non-DOCX input and DOCTYPE are rejected', () => {
