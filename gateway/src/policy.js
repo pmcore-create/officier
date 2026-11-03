@@ -23,7 +23,8 @@ const WRITABLE = {
 };
 
 const MODES = {
-  // Owner prepares the draft; no route yet, nothing to track.
+  // Owner prepares the draft. The editor tracks nothing; the owner's own changes are tracked by the
+  // review panel where the route has to see them (trackOwnChanges below).
   EDIT: {editorMode: 'edit', permissions: {edit: true, review: false, comment: true}, trackChanges: false},
   // Owner reworks a returned document and accepts or rejects reviewers' suggestions. The editor's own
   // accept/reject buttons stay off (review: false): decisions go through the review panel, which
@@ -57,7 +58,7 @@ function stampFor(role, round, stageNo) {
   return null;
 }
 
-function resolvePolicy({status, role, round = 0, stageNo, fileType = 'docx'}) {
+function resolvePolicy({status, role, round = 0, stageNo, fileType = 'docx', versionNo = 1}) {
   const errors = [];
   if (!STATUSES.includes(status)) errors.push(`access.status must be one of ${STATUSES.join(', ')}`);
   if (!ROLES.includes(role)) errors.push(`access.role must be one of ${ROLES.join(', ')}`);
@@ -86,6 +87,12 @@ function resolvePolicy({status, role, round = 0, stageNo, fileType = 'docx'}) {
   if (reviewVisible) {
     reviewPanel = definition.permissions.edit || definition.permissions.review ? 'right' : 'left';
   }
+  // The route sees what the owner changed: after a return, and in a new edition of a published
+  // document, the owner's edits are tracked under the owner stamp and highlighted for the route.
+  // The editor applies review.trackChanges only with permissions.review, which the owner must not
+  // have (it would accept suggestions without a reason), so the review panel switches tracking on.
+  // The PDF of the version is printed from a copy where these changes are accepted (revisions.js).
+  const trackOwnChanges = reviewPanel !== null && (mode === 'DECIDE' || (mode === 'EDIT' && (round > 1 || versionNo > 1)));
   const customization = {
     review: {
       trackChanges: definition.trackChanges,
@@ -95,7 +102,7 @@ function resolvePolicy({status, role, round = 0, stageNo, fileType = 'docx'}) {
     comments: reviewVisible,
     // Officier extension (docker/branding/apply.js): the native comments panel opens on the left
     // when the review panel takes the right side and the route participants are answering comments.
-    officier: {openComments: reviewPanel === 'right' && onRoute && ROUTE_ROLES.includes(role)}
+    officier: {openComments: reviewPanel === 'right' && onRoute && ROUTE_ROLES.includes(role), trackOwnChanges}
   };
   return {
     mode,

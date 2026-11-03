@@ -20,7 +20,7 @@ function verify(token) {
 test('Reviewer config is signed and carries the policy', () => {
   const {config, policy, apiUrl} = buildEditorConfig(request(), settings);
   assert.equal(apiUrl, 'https://docs.example.kz/web-apps/apps/api/documents/api.js');
-  assert.deepEqual(policy, {mode: 'REVIEW', stamp: 'R1.S2', readOnly: false, reviewVisible: true, reviewPanel: 'right'});
+  assert.deepEqual(policy, {mode: 'REVIEW', stamp: 'R1.S2', readOnly: false, reviewVisible: true, reviewPanel: 'right', trackOwnChanges: false});
   assert.deepEqual(config.editorConfig.plugins, {
     pluginsData: ['https://docs.example.kz/sdkjs-plugins/qms-review/config.json'],
     autostart: ['asc.{8D3B2A54-0C1E-4F6A-9B7D-2E5F1C3A9D60}']

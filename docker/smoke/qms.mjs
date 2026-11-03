@@ -288,11 +288,15 @@ try {
   await decisionPanel.locator('textarea.decide-text').fill('Согласна');
   await decisionPanel.locator('button.decide-confirm').click();
   await decisionPanel.waitForFunction(() => /^Правок без решения: 1 · комментариев: 1 · решений: 2/.test(document.getElementById('summary').textContent), null, {timeout: 15000});
-  // Deleting a suggested sentence directly (the owner edits freely) still asks for a decision.
+  // After a return the panel tracks the owner's own edits for the route (trackOwnChanges).
+  assert.equal(await closing.editor.evaluate(() => window.Asc.editor.asc_IsTrackRevisions()), true, 'the owner\'s rework is tracked');
+  // Deleting a suggested sentence without tracking (the owner edits freely) still asks for a decision.
   // The editor takes keys only after a click on the page, as with a real user coming from the panel.
   await closing.editor.locator('#editor_sdk').click({position: {x: 600, y: 500}});
   await closing.editor.evaluate(() => {
-    const doc = window.Asc.editor.WordControl.m_oLogicDocument;
+    const api = window.Asc.editor;
+    const doc = api.WordControl.m_oLogicDocument;
+    api.asc_SetLocalTrackRevisions(false); // the panel switches tracking back on after the key
     doc.MoveCursorToEndPos(false);
     for (let i = 0; i < 8; i++) doc.MoveCursorLeft(true, false); // " Лишнее."
   });
@@ -313,6 +317,20 @@ try {
   assert.equal(await closing.editor.evaluate(() => window.Asc.editor.WordControl.m_oLogicDocument.GetText().trim()), 'Officier итоговый document.');
   await closing.page.screenshot({path: new URL('./smoke-qms-decisions.png', import.meta.url).pathname});
   console.log('Owner decisions: rejection with a reason, acceptance with a comment, deleted suggestion recorded');
+
+  // 3d2. The owner's own edit after the return is a tracked change under the owner stamp: shown to
+  // the route, no decision asked from the owner.
+  await decisionPanel.waitForFunction(() => window.parent.Asc.editor.asc_IsTrackRevisions(), null, {timeout: 15000});
+  await closing.editor.evaluate(() => {
+    const api = window.Asc.editor;
+    api.WordControl.m_oLogicDocument.MoveCursorToEndPos(false);
+    api.asc_AddText(' Уточнено автором.');
+  });
+  await decisionPanel.waitForFunction(() => /^Правок без решения: 0 · комментариев: 1 · изменений автора: 1 · решений: 3/.test(document.getElementById('summary').textContent), null, {timeout: 15000});
+  const ownBlock = authorBlock('Сидорова А. А.');
+  assert.match(await ownBlock.innerText(), /Ваши изменения после возврата[\s\S]*Уточнено автором/);
+  assert.equal(await ownBlock.locator('button.link').count(), 0, 'no accept/reject for the owner\'s own change');
+  console.log('Owner rework: tracked under the owner stamp, no decision asked');
 
   // 3e. Status change: the owner is still typing when the portal closes the session; the server
   // saves everything and the old tab cannot continue.
