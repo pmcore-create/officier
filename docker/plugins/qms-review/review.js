@@ -203,6 +203,7 @@
     var byName = {};
     var decisions = [];
     var revisions = api.asc_GetTrackRevisionsReportByAuthors();
+    latestRevisions = revisions;
     Object.keys(revisions).forEach(function (raw) {
       (revisions[raw] || []).forEach(function (change, index) {
         var author = authorEntry(byName, raw);
@@ -464,6 +465,8 @@
 
   function openForm(key, decision) {
     pending = {key: key, decision: decision, text: ''};
+    // The decision form needs the room of the list; the balloon only starts it.
+    if (view !== 'list') setView('list');
     if (latest) render(latest);
   }
 
@@ -624,11 +627,261 @@
     var message = window.document.getElementById('message');
     window.document.getElementById('actions').classList.toggle('hidden', !state.me.canLock && message.classList.contains('hidden'));
     var list = window.document.getElementById('list');
+    // Rebuilding the list must not throw the reader back to its top.
+    var scrolled = window.document.scrollingElement ? window.document.scrollingElement.scrollTop : 0;
     list.replaceChildren();
     renderOrphans(list, state.orphans);
     renderLocks(list, state.locks, state.me);
     renderAuthors(list, state.authors, state.me);
     renderDecisions(list, state.decisions);
+    if (window.document.scrollingElement) window.document.scrollingElement.scrollTop = scrolled;
+    renderNotes(state);
+    buildBalloons(state);
+  }
+
+  // ---- "Напротив текста": balloons beside their place in the text, as in Word's markup area ----
+
+  var VIEW_KEY = 'officier-qms-review-view';
+  var view = 'margin';
+  try {
+    if (window.localStorage.getItem(VIEW_KEY) === 'list') view = 'list';
+  } catch (err) {
+    // storage may be unavailable; the margin view is the default
+  }
+  var latestRevisions = {};
+  var balloons = [];
+  var layoutKey = '';
+
+  function setView(next) {
+    view = next;
+    try {
+      window.localStorage.setItem(VIEW_KEY, next);
+    } catch (err) {
+      // the choice then lasts for this session only
+    }
+    applyView();
+  }
+
+  function applyView() {
+    var doc = window.document;
+    doc.body.classList.toggle('margin-view', view === 'margin');
+    doc.getElementById('margin').classList.toggle('hidden', view !== 'margin');
+    doc.getElementById('notes').classList.toggle('hidden', view !== 'margin');
+    Array.prototype.forEach.call(doc.querySelectorAll('#views button'), function (node) {
+      node.classList.toggle('active', node.getAttribute('data-view') === view);
+    });
+    layoutKey = '';
+  }
+
+  // What the margin cannot show is one click away in the list.
+  function renderNotes(state) {
+    var notes = window.document.getElementById('notes');
+    notes.replaceChildren();
+    var lines = [];
+    if (state.orphans.length) lines.push('Правки исчезли без решения: ' + state.orphans.length);
+    if (state.locks.length) lines.push('Заблокированные фрагменты: ' + state.locks.length);
+    if (state.decisions.length) lines.push('Решения автора: ' + state.decisions.length);
+    lines.forEach(function (text) {
+      notes.append(button('link', text + ' — показать списком', function () { setView('list'); }));
+    });
+  }
+
+  function commentEntries(api) {
+    var doc = logicDocument(api);
+    var all = doc && doc.Comments && doc.Comments.GetAllComments ? doc.Comments.GetAllComments() : {};
+    return Object.keys(all).map(function (id) { return all[id]; }).filter(function (comment) {
+      var data = comment.GetData && comment.GetData();
+      if (!data || (comment.IsGlobalComment && comment.IsGlobalComment())) return false;
+      return !parseDecision(data.GetUserName(), data.GetText(), true);
+    });
+  }
+
+  // One balloon per suggestion and per comment thread; anchor() says where its text is.
+  function buildBalloons(state) {
+    var api = editorApi();
+    var cards = window.document.getElementById('cards');
+    cards.replaceChildren();
+    balloons = [];
+    layoutKey = '';
+    if (!api) return;
+    state.authors.forEach(function (author) {
+      var owner = isOwnerStamp(author.stamp);
+      author.suggestions.forEach(function (suggestion) {
+        var first = suggestion.pieces[0];
+        var node = balloonNode(author, (suggestion.pieces.length > 1 ? 'Заменено' : first.label) + (owner ? ' · изменение автора' : ''), suggestion.date);
+        suggestion.pieces.forEach(function (piece) {
+          if (piece.value) node.append(element('div', 'value' + (piece.type === 'TextAdd' ? ' add' : piece.type === 'TextRem' ? ' del' : ''), '«' + piece.value + '»'));
+        });
+        if (state.me.canDecide && !owner) {
+          var box = element('div', 'decide');
+          box.append(
+            button('link', 'Принять', function (event) { event.stopPropagation(); openForm(suggestion.key, 'ACCEPTED'); }),
+            button('link reject', 'Отклонить', function (event) { event.stopPropagation(); openForm(suggestion.key, 'REJECTED'); }));
+          node.append(box);
+        }
+        node.addEventListener('click', function () { goTo(author.raw, first.index); });
+        balloons.push({node: node, color: author.color, anchor: function () {
+          var change = (latestRevisions[author.raw] || [])[first.index];
+          return change ? changeAnchor(api, change) : null;
+        }});
+      });
+    });
+    commentEntries(api).forEach(function (comment) {
+      var data = comment.GetData();
+      var raw = data.GetUserName();
+      var author = parseAuthor(raw);
+      var color = userColor(data.GetUserId ? data.GetUserId() : '', raw);
+      var utc = parseInt(data.m_sOOTime, 10);
+      var node = balloonNode({name: author.name, stage: author.stage, color: color}, 'Комментарий', isNaN(utc) ? data.GetDateTime() : utc);
+      node.append(element('div', 'value', data.GetText() || ''));
+      for (var i = 0; i < (data.GetRepliesCount ? data.GetRepliesCount() : 0); i++) {
+        var reply = data.GetReply(i);
+        node.append(element('div', 'reply', parseAuthor(reply.GetUserName()).name + ': ' + (reply.GetText() || '')));
+      }
+      node.addEventListener('click', function () { selectComment(api, comment.GetId()); });
+      balloons.push({node: node, color: color, anchor: function () { return commentAnchor(comment); }});
+    });
+    if (!balloons.length) {
+      cards.append(element('div', 'empty', 'Предложенные правки и комментарии появятся здесь напротив своего места в тексте.'));
+      return;
+    }
+    balloons.forEach(function (item) { cards.append(item.node); });
+  }
+
+  function balloonNode(author, what, date) {
+    var node = element('div', 'balloon');
+    node.style.borderLeftColor = author.color;
+    node.append(element('div', 'who', author.name), element('div', 'what', (author.stage ? author.stage + ' · ' : '') + time(date)),
+      element('div', 'what', what));
+    return node;
+  }
+
+  function selectComment(api, id) {
+    try {
+      if (api.asc_selectComment) api.asc_selectComment(id);
+      if (api.asc_showComment) api.asc_showComment(id, false);
+    } catch (err) {
+      // navigation is a convenience only
+    }
+  }
+
+  // The line of the change, as the editor positions its own review popup (track-revisions-manager).
+  function changeAnchor(api, change) {
+    var paragraph = change.GetElement && change.GetElement();
+    if (!paragraph || !paragraph.Pages || !paragraph.Lines || !paragraph.Pages.length || !paragraph.Lines.length) return null;
+    var place = {Page: 0, Line: 0};
+    var start = change.GetStartPos && change.GetStartPos();
+    if (start && paragraph.Get_ParaPosByContentPos) {
+      var found = paragraph.Get_ParaPosByContentPos(start);
+      if (found && paragraph.Pages.length > found.Page && paragraph.Lines.length > found.Line) place = found;
+    }
+    var page = paragraph.GetAbsolutePage(place.Page);
+    var y = paragraph.Pages[place.Page].Y + paragraph.Lines[place.Line].Top;
+    var x = logicDocument(api).Get_PageLimits(page).XLimit;
+    var transform = paragraph.Get_ParentTextTransform && paragraph.Get_ParentTextTransform();
+    if (transform) y = transform.TransformPointY(x, y);
+    return {page: page, x: x, y: y};
+  }
+
+  function commentAnchor(comment) {
+    var info = comment.m_oStartInfo;
+    return info && info.PageNum >= 0 ? {page: info.PageNum, x: info.X, y: info.Y} : null;
+  }
+
+  // Places the balloons of the visible pages at the height of their text, pushing down the ones that
+  // would overlap, and draws a dashed leader from the text side to each balloon.
+  function layoutBalloons(force) {
+    if (view !== 'margin') return;
+    var api = editorApi();
+    var doc = api && logicDocument(api);
+    var drawing = doc && doc.getDrawingDocument && doc.getDrawingDocument();
+    var sdk = window.parent.document.getElementById('editor_sdk');
+    var frame = window.frameElement;
+    var margin = window.document.getElementById('margin');
+    if (!drawing || !sdk || !frame) return;
+    var sdkBox = sdk.getBoundingClientRect();
+    var frameBox = frame.getBoundingClientRect();
+    var marginBox = margin.getBoundingClientRect();
+    var control = api.WordControl || {};
+    var key = [drawing.m_lDrawingFirst, drawing.m_lDrawingEnd, control.m_dScrollY, control.m_nZoomValue,
+      Math.round(sdkBox.top - frameBox.top), Math.round(marginBox.top), margin.clientHeight, margin.clientWidth, balloons.length].join();
+    if (!force && key === layoutKey) return;
+    layoutKey = key;
+    // The panel left of the text (comment-only and view modes) draws its leaders from the right.
+    var leftOfText = frameBox.left + frameBox.width / 2 < sdkBox.left + sdkBox.width / 2;
+    window.document.body.classList.toggle('docked-left', leftOfText);
+    var height = margin.clientHeight;
+    var width = margin.clientWidth;
+    var above = [];
+    var below = [];
+    var shown = [];
+    balloons.forEach(function (item) {
+      var at = null;
+      try {
+        at = item.anchor();
+      } catch (err) {
+        at = null; // the document is being rebuilt; the next layout will place it
+      }
+      item.y = null;
+      if (!at) return;
+      if (at.page < drawing.m_lDrawingFirst) return above.push(item);
+      if (at.page > drawing.m_lDrawingEnd) return below.push(item);
+      var point = drawing.ConvertCoordsToCursorWR(at.x, at.y, at.page);
+      var y = point.Y + sdkBox.top - frameBox.top - marginBox.top;
+      if (y < 0) return above.push(item);
+      if (y > height) return below.push(item);
+      item.y = y;
+      shown.push(item);
+    });
+    shown.sort(function (a, b) { return a.y - b.y; });
+    var bottom = above.length ? 30 : 0;
+    var leaders = [];
+    balloons.forEach(function (item) { item.node.style.display = 'none'; });
+    shown.forEach(function (item) {
+      item.node.style.display = '';
+      var top = Math.max(item.y - 8, bottom + 6);
+      item.node.style.top = top + 'px';
+      var boxHeight = item.node.offsetHeight;
+      if (top + boxHeight > height - (below.length ? 30 : 0) && top > item.y + 40) {
+        item.node.style.display = 'none';
+        below.push(item);
+        return;
+      }
+      bottom = top + boxHeight;
+      var edge = leftOfText ? width : 0;
+      var inner = leftOfText ? width - 14 : 14;
+      var bend = leftOfText ? width - 7 : 7;
+      leaders.push('<path d="M' + edge + ' ' + item.y + ' H' + bend + ' V' + (top + 10) + ' H' + inner + '" fill="none" stroke="' + item.color +
+        '" stroke-width="1" stroke-dasharray="3 2"/>');
+    });
+    window.document.getElementById('links').innerHTML = leaders.join('');
+    edgeButton('above', above, '▲ Выше по тексту: ');
+    edgeButton('below', below, '▼ Ниже по тексту: ');
+  }
+
+  function edgeButton(id, items, text) {
+    var node = window.document.getElementById(id);
+    node.classList.toggle('hidden', !items.length);
+    node.textContent = items.length ? text + items.length : '';
+    node.onclick = items.length ? function () { items[id === 'above' ? items.length - 1 : 0].node.click(); } : null;
+  }
+
+  // Scrolling over the balloons scrolls the document they follow.
+  function scrollDocument(event) {
+    var api = editorApi();
+    var scroll = api && api.WordControl && api.WordControl.m_oScrollVerApi;
+    if (!scroll || !scroll.scrollByY) return;
+    event.preventDefault();
+    scroll.scrollByY(event.deltaMode === 1 ? event.deltaY * 40 : event.deltaY);
+  }
+
+  function followDocument() {
+    try {
+      layoutBalloons(false);
+    } catch (err) {
+      // the editor is between states; the next frame retries
+    }
+    window.requestAnimationFrame(followDocument);
   }
 
   function refresh() {
@@ -709,8 +962,14 @@
   function start() {
     if (timer) return;
     window.document.getElementById('lock').addEventListener('click', lockSelection);
+    Array.prototype.forEach.call(window.document.querySelectorAll('#views button'), function (node) {
+      node.addEventListener('click', function () { setView(node.getAttribute('data-view')); });
+    });
+    window.document.getElementById('margin').addEventListener('wheel', scrollDocument, {passive: false});
+    applyView();
     refresh();
     timer = window.setInterval(refresh, REFRESH_MS);
+    window.requestAnimationFrame(followDocument);
   }
 
   // Data is read straight from the editor, so the panel does not wait for the plugin handshake

@@ -53,15 +53,51 @@
   .decision.accepted .what { color: #1d7a3e; }
   .decision.rejected .what { color: #b3261e; }
   .reason { margin-top: 2px; white-space: pre-wrap; }
+  /* "Напротив текста": balloons beside their place in the text, as in Word's markup area. */
+  #views { display: flex; padding: 6px 12px; border-bottom: 1px solid var(--border-divider, #e5e5e5); }
+  #views button { flex: 1; padding: 4px 6px; border: 1px solid var(--border-regular-control, #c0c0c0); background: var(--background-normal, #fff); color: inherit; font: inherit; cursor: pointer; }
+  #views button:first-child { border-radius: 4px 0 0 4px; }
+  #views button:last-child { border-radius: 0 4px 4px 0; border-left: 0; }
+  #views button.active { background: #155dd0; border-color: #155dd0; color: #fff; }
+  body.margin-view { overflow: hidden; display: flex; flex-direction: column; }
+  body.margin-view #list { display: none; }
+  #notes { border-bottom: 1px solid var(--border-divider, #e5e5e5); }
+  #notes:empty { display: none; }
+  #notes .link { display: block; padding: 5px 12px; text-align: left; }
+  #margin { position: relative; flex: 1; min-height: 0; overflow: hidden; }
+  #links { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+  #cards { position: absolute; left: 0; top: 0; right: 0; bottom: 0; }
+  .balloon { position: absolute; left: 14px; right: 6px; box-sizing: border-box; padding: 5px 8px 6px; border: 1px solid var(--border-divider, #e0e0e0); border-left: 3px solid #999; border-radius: 4px; background: var(--background-normal, #fff); box-shadow: 0 1px 3px rgba(0, 0, 0, .1); cursor: pointer; }
+  body.docked-left .balloon { left: 6px; right: 14px; }
+  .balloon:hover { background: var(--highlight-button-hover, #f7f7f7); }
+  .balloon .who { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .balloon .reply { margin-top: 3px; padding-left: 7px; border-left: 2px solid var(--border-divider, #e5e5e5); }
+  .balloon .decide { padding: 3px 0 0; }
+  .edge { position: absolute; left: 14px; right: 6px; z-index: 2; box-sizing: border-box; padding: 3px 8px; border: 1px solid var(--border-regular-control, #c0c0c0); border-radius: 4px; background: var(--background-toolbar, #f5f5f5); color: #155dd0; font: inherit; text-align: left; cursor: pointer; }
+  body.docked-left .edge { left: 6px; right: 14px; }
+  .edge.top { top: 4px; }
+  .edge.bottom { bottom: 4px; }
+  #margin .empty { position: absolute; left: 0; right: 0; top: 0; }
 </style>
 <script src="review.js"></script>
 </head>
 <body>
 <div id="summary">Загрузка правок…</div>
+<div id="views">
+  <button type="button" data-view="margin" title="Каждая правка и комментарий напротив своего места в тексте и движутся вместе с ним, как на полях Word">Напротив текста</button>
+  <button type="button" data-view="list" title="Все правки и комментарии по авторам, решения автора и блокировки">Списком</button>
+</div>
 <div id="actions">
   <button id="lock" class="hidden" type="button" title="Выделенный текст сможет изменить только разработчик документа">Заблокировать выделенное</button>
   <div id="message" class="message hidden" role="status"></div>
 </div>
 <div id="list"></div>
+<div id="notes"></div>
+<div id="margin" class="hidden">
+  <svg id="links" xmlns="http://www.w3.org/2000/svg"></svg>
+  <div id="cards"></div>
+  <button id="above" class="edge top hidden" type="button"></button>
+  <button id="below" class="edge bottom hidden" type="button"></button>
+</div>
 </body>
 </html>

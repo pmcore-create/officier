@@ -122,6 +122,8 @@ async function reviewPanel(page, summary) {
       });
       throw new Error(`Review panel shows ${JSON.stringify(state)}: ${err.message}`);
     });
+  // The panel opens beside the text (balloons); the checks below work with the list.
+  await panel.click('#views button[data-view="list"]');
   return {panel, text: await panel.evaluate(() => document.body.innerText)};
 }
 
