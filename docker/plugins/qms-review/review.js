@@ -628,13 +628,13 @@
     window.document.getElementById('actions').classList.toggle('hidden', !state.me.canLock && message.classList.contains('hidden'));
     var list = window.document.getElementById('list');
     // Rebuilding the list must not throw the reader back to its top.
-    var scrolled = window.document.scrollingElement ? window.document.scrollingElement.scrollTop : 0;
+    var scrolled = list.scrollTop;
     list.replaceChildren();
     renderOrphans(list, state.orphans);
     renderLocks(list, state.locks, state.me);
     renderAuthors(list, state.authors, state.me);
     renderDecisions(list, state.decisions);
-    if (window.document.scrollingElement) window.document.scrollingElement.scrollTop = scrolled;
+    list.scrollTop = scrolled;
     renderNotes(state);
     buildBalloons(state);
   }
@@ -651,6 +651,10 @@
   var latestRevisions = {};
   var balloons = [];
   var layoutKey = '';
+  // More balloons than fit beside the visible text, or the end of the document: the wheel then moves
+  // the stack itself by this many pixels, so that every balloon can be reached.
+  var stackOffset = 0;
+  var stackOverflow = 0;
 
   function setView(next) {
     view = next;
@@ -804,7 +808,7 @@
     var marginBox = margin.getBoundingClientRect();
     var control = api.WordControl || {};
     var key = [drawing.m_lDrawingFirst, drawing.m_lDrawingEnd, control.m_dScrollY, control.m_nZoomValue,
-      Math.round(sdkBox.top - frameBox.top), Math.round(marginBox.top), margin.clientHeight, margin.clientWidth, balloons.length].join();
+      Math.round(sdkBox.top - frameBox.top), Math.round(marginBox.top), margin.clientHeight, margin.clientWidth, balloons.length, stackOffset].join();
     if (!force && key === layoutKey) return;
     layoutKey = key;
     // The panel left of the text (comment-only and view modes) draws its leaders from the right.
@@ -834,45 +838,95 @@
       shown.push(item);
     });
     shown.sort(function (a, b) { return a.y - b.y; });
-    var bottom = above.length ? 30 : 0;
-    var leaders = [];
     balloons.forEach(function (item) { item.node.style.display = 'none'; });
     shown.forEach(function (item) {
       item.node.style.display = '';
-      var top = Math.max(item.y - 8, bottom + 6);
-      item.node.style.top = top + 'px';
-      var boxHeight = item.node.offsetHeight;
-      if (top + boxHeight > height - (below.length ? 30 : 0) && top > item.y + 40) {
+      item.h = item.node.offsetHeight;
+    });
+    // As in Word: each balloon at its line, pushed down by the one above; when the stack runs past
+    // the bottom, it is pulled up again as far as the top allows.
+    var topLimit = above.length ? 30 : 0;
+    var bottomLimit = height - (below.length ? 30 : 0);
+    var last = topLimit - 6;
+    shown.forEach(function (item) {
+      item.top = Math.max(item.y - 8, last + 6);
+      last = item.top + item.h;
+    });
+    var ceiling = bottomLimit;
+    for (var i = shown.length - 1; i >= 0; i--) {
+      shown[i].top = Math.max(Math.min(shown[i].top, ceiling - shown[i].h), topLimit);
+      ceiling = shown[i].top - 6;
+    }
+    // Pulled up to the top and still too long: the rest is reached by moving the stack.
+    last = topLimit - 6;
+    shown.forEach(function (item) {
+      item.top = Math.max(item.top, last + 6);
+      last = item.top + item.h;
+    });
+    stackOverflow = Math.max(0, last - bottomLimit);
+    stackOffset = Math.min(Math.max(stackOffset, 0), stackOverflow);
+    var hiddenAbove = 0;
+    var hiddenBelow = 0;
+    var leaders = [];
+    var edge = leftOfText ? width : 0;
+    var inner = leftOfText ? width - 14 : 14;
+    var bend = leftOfText ? width - 7 : 7;
+    shown.forEach(function (item) {
+      var top = item.top - stackOffset;
+      if (top + item.h <= topLimit) {
         item.node.style.display = 'none';
-        below.push(item);
+        hiddenAbove++;
         return;
       }
-      bottom = top + boxHeight;
-      var edge = leftOfText ? width : 0;
-      var inner = leftOfText ? width - 14 : 14;
-      var bend = leftOfText ? width - 7 : 7;
+      if (top >= bottomLimit) {
+        item.node.style.display = 'none';
+        hiddenBelow++;
+        return;
+      }
+      item.node.style.top = top + 'px';
       leaders.push('<path d="M' + edge + ' ' + item.y + ' H' + bend + ' V' + (top + 10) + ' H' + inner + '" fill="none" stroke="' + item.color +
         '" stroke-width="1" stroke-dasharray="3 2"/>');
     });
     window.document.getElementById('links').innerHTML = leaders.join('');
-    edgeButton('above', above, '▲ Выше по тексту: ');
-    edgeButton('below', below, '▼ Ниже по тексту: ');
+    edgeButton('above', above, hiddenAbove, '▲ Выше: ');
+    edgeButton('below', below, hiddenBelow, '▼ Ниже: ');
   }
 
-  function edgeButton(id, items, text) {
+  // Balloons off screen: those of the text above or below, and those of the stack moved away.
+  function edgeButton(id, offText, offStack, text) {
     var node = window.document.getElementById(id);
-    node.classList.toggle('hidden', !items.length);
-    node.textContent = items.length ? text + items.length : '';
-    node.onclick = items.length ? function () { items[id === 'above' ? items.length - 1 : 0].node.click(); } : null;
+    var count = offText.length + offStack;
+    node.classList.toggle('hidden', !count);
+    node.textContent = count ? text + count : '';
+    node.onclick = !count ? null : function () {
+      if (offStack) {
+        moveStack(id === 'above' ? -120 : 120);
+      } else {
+        offText[id === 'above' ? offText.length - 1 : 0].node.click();
+      }
+    };
   }
 
-  // Scrolling over the balloons scrolls the document they follow.
+  function moveStack(delta) {
+    var next = Math.min(Math.max(stackOffset + delta, 0), stackOverflow);
+    if (next === stackOffset) return false;
+    stackOffset = next;
+    layoutBalloons(true);
+    return true;
+  }
+
+  // Scrolling over the balloons scrolls the document they follow. Where the document goes no further
+  // down (its end), the stack itself moves; up, a moved stack comes back first.
   function scrollDocument(event) {
-    var api = editorApi();
-    var scroll = api && api.WordControl && api.WordControl.m_oScrollVerApi;
-    if (!scroll || !scroll.scrollByY) return;
     event.preventDefault();
-    scroll.scrollByY(event.deltaMode === 1 ? event.deltaY * 40 : event.deltaY);
+    var api = editorApi();
+    var control = api && api.WordControl;
+    var scroll = control && control.m_oScrollVerApi;
+    var delta = event.deltaMode === 1 ? event.deltaY * 40 : event.deltaMode === 2 ? event.deltaY * 400 : event.deltaY;
+    if (delta < 0 && moveStack(delta)) return;
+    var before = control ? control.m_dScrollY : 0;
+    if (scroll && scroll.scrollByY) scroll.scrollByY(delta);
+    if (!control || control.m_dScrollY === before) moveStack(delta);
   }
 
   function followDocument() {

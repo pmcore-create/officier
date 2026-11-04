@@ -6,8 +6,12 @@
 <script src="../v1/plugins.js"></script>
 <link rel="stylesheet" href="../v1/plugins.css">
 <style>
-  html, body { margin: 0; height: 100%; }
-  body { font: 12px/1.4 "Segoe UI", Arial, sans-serif; color: var(--text-normal, #222); background: var(--background-normal, #fff); overflow-y: auto; }
+  /* The editor creates the plugin frame with scrolling="no": the page itself never scrolls, so the
+     list scrolls in its own box and the balloons follow the document. */
+  html, body { margin: 0; height: 100%; overflow: hidden; }
+  body { font: 12px/1.4 "Segoe UI", Arial, sans-serif; color: var(--text-normal, #222); background: var(--background-normal, #fff); display: flex; flex-direction: column; }
+  body > * { flex: none; }
+  #list { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
   #summary { padding: 10px 12px 8px; color: var(--text-secondary, #666); border-bottom: 1px solid var(--border-divider, #e5e5e5); }
   .author { border-bottom: 1px solid var(--border-divider, #e5e5e5); }
   .author-head { display: flex; align-items: flex-start; gap: 8px; padding: 10px 12px 6px; }
@@ -59,12 +63,11 @@
   #views button:first-child { border-radius: 4px 0 0 4px; }
   #views button:last-child { border-radius: 0 4px 4px 0; border-left: 0; }
   #views button.active { background: #155dd0; border-color: #155dd0; color: #fff; }
-  body.margin-view { overflow: hidden; display: flex; flex-direction: column; }
   body.margin-view #list { display: none; }
   #notes { border-bottom: 1px solid var(--border-divider, #e5e5e5); }
   #notes:empty { display: none; }
   #notes .link { display: block; padding: 5px 12px; text-align: left; }
-  #margin { position: relative; flex: 1; min-height: 0; overflow: hidden; }
+  #margin { position: relative; flex: 1 1 auto; min-height: 0; overflow: hidden; }
   #links { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
   #cards { position: absolute; left: 0; top: 0; right: 0; bottom: 0; }
   .balloon { position: absolute; left: 14px; right: 6px; box-sizing: border-box; padding: 5px 8px 6px; border: 1px solid var(--border-divider, #e0e0e0); border-left: 3px solid #999; border-radius: 4px; background: var(--background-normal, #fff); box-shadow: 0 1px 3px rgba(0, 0, 0, .1); cursor: pointer; }
